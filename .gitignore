@@ -1,0 +1,74 @@
+# General
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Dependency directories
+node_modules/
+bower_components/
+vendor/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# System files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+
+# C++
+*.o
+*.obj
+*.exe
+*.out
+*.so
+*.a
+*.dSYM/
+*.vscode
+
+# macOS
+*.DS_Store
+
+# Docker
+docker-compose.override.yml
+*.env
+
+# Go
+bin/
+*.test
+
+# JetBrains IDEs
+.idea/
+*.iml
+
+# Additional ignored files
+*.class
+*.jar
+*.war
+*.ear
+
+# Generated files
+*.map
+*.lock
+*.min.js
+*.min.css
+
