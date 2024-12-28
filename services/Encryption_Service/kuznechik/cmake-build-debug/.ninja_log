@@ -1,0 +1,8 @@
+# ninja log v6
+2	787	1730214373147690264	CMakeFiles/Kuznyechik.dir/src/kuznechik/kuznyechik.cpp.o	70706f61ffdf1363
+5	954	1730215113380947570	CMakeFiles/RSA.dir/src/rsa/rsa.cpp.o	7990413c507b4937
+9	1428	1730240191937951609	CMakeFiles/Kuznyechik.dir/tests/kuznyechik_test.cpp.o	35a44e0709ee1068
+1429	1574	1730240193357424192	Kuznyechik	7c69cb33a0dc3552
+954	1078	1730215114330352298	RSA	d91cbb70a7df8731
+8	992	1730214497385609969	CMakeFiles/Kuznyechik.dir/src/kuznechik/kuznechik.cpp.o	59e58477833245a6
+3	913	1730215113379548700	CMakeFiles/RSA.dir/tests/rsa_test.cpp.o	900b54ef3eb13ae8
