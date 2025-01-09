@@ -25,7 +25,6 @@ out/
 *.bak
 
 # System files
-.idea/
 .vscode/
 *.sublime-workspace
 *.sublime-project
