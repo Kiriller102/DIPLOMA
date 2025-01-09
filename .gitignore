@@ -24,7 +24,7 @@ out/
 *.bak
 
 # System files
-cmake-build-debug
+cmake-build-debug/
 .idea/
 .vscode/
 *.sublime-workspace
