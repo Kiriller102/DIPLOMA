@@ -55,7 +55,7 @@ func GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 			&user.IsActive)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return users, err
+				return users, nil
 			}
 			log.Fatalf("error getting users: %v", err)
 			return []models.User{}, err
