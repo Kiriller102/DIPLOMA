@@ -16,20 +16,20 @@ type UserService struct {
 	db       *sqlx.DB
 }
 
-func NewUserService(userRepo repository.UserRepository, db *sqlx.DB) *UserService {
+func NewUserService(db *sqlx.DB) (*UserService, error) {
 	if db == nil {
 		log.Printf("database is nil")
-		return nil
+		return nil, fmt.Errorf("database is nil")
 	}
 	if db.Ping() != nil {
 		log.Printf("error conecction to database")
-		return nil
+		return nil, fmt.Errorf("error conecction to database")
 	}
 
 	return &UserService{
-		userRepo: userRepo,
-		db:       db,
-	}
+		//userRepo: userRepo,
+		db: db,
+	}, nil
 }
 
 func (s *UserService) CreateUser(user models.User) (models.User, error) {
