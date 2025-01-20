@@ -27,43 +27,43 @@ func NewUserService(db *sqlx.DB) (*UserService, error) {
 	}
 
 	return &UserService{
-		//userRepo: userRepo,
-		db: db,
+		userRepo: repository.UserRepository{},
+		db:       db,
 	}, nil
 }
 
-func (s *UserService) CreateUser(user models.User) (models.User, error) {
+func (s *UserService) CreateUser(user models.User) error {
 	if user.Email == "" || user.PasswordHash == "" {
-		return models.User{}, errors.New("email or password is empty")
+		return errors.New("email or password is empty")
 	}
 
 	if !isValidEmail(user.Email) {
 		log.Printf("error incorrect email: %v", user.Email)
-		return models.User{}, errors.New("invalid email")
+		return errors.New("invalid email")
 	}
 
 	if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
 		log.Printf("error get user by email")
-		return models.User{}, err
+		return err
 	} else if u != (models.User{}) {
 		log.Printf("error user already exists with email: %v", user.Email)
-		return models.User{}, errors.New("user already exists with email: " + user.Email)
+		return errors.New("user already exists with email: " + user.Email)
 	}
 
 	if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
 		log.Printf("error get user by username")
-		return models.User{}, err
+		return err
 	} else if u != (models.User{}) {
 		log.Printf("error user already exists with username: %v", user.Username)
-		return models.User{}, errors.New("user already exists with username: " + user.Username)
+		return errors.New("user already exists with username: " + user.Username)
 	}
 
 	err := s.userRepo.CreateUser(s.db, user)
 	if err != nil {
-		return models.User{}, err
+		return err
 	}
 
-	return user, nil
+	return nil
 }
 
 func (s *UserService) UpdateUser(user models.User) (models.User, error) {
@@ -120,21 +120,22 @@ func (s *UserService) DeleteUser(user models.User) error {
 func (s *UserService) GetUser(user models.User) (models.User, error) {
 
 	u := models.User{}
+	var err error
 	switch {
 	case user.Email != "":
-		if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
+		if u, err = s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
 			log.Printf("error get user by email")
 		} else if u != (models.User{}) {
 			log.Printf("error no users exist with email: %v", user.Email)
 		}
 	case user.Username != "":
-		if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
+		if u, err = s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
 			log.Printf("error get user by username")
 		} else if u != (models.User{}) {
 			log.Printf("error no users exist with username: %v", user.Username)
 		}
 	default:
-		if u, err := s.userRepo.GetUserByID(s.db, user.ID); err != nil {
+		if u, err = s.userRepo.GetUserByID(s.db, user.ID); err != nil {
 			log.Printf("error get user by id")
 		} else if u.ID != user.ID {
 			log.Printf("error user not found: %v", user)
