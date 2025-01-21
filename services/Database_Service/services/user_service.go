@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/services/Database_Service/models"
-	"project/services/Database_Service/repository"
+	"project/models"
+	"project/repository"
 	"regexp"
 	"time"
 )

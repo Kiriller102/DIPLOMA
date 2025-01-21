@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/services/Database_Service/models"
+	"project/models"
 )
 
-type UserRepository interface {
+type UserRepositoryInterface interface {
 	CreateUser(db *sqlx.DB, user models.User) error
 	GetAllUsers(db *sqlx.DB) ([]models.User, error)
 	GetUserByID(db *sqlx.DB, id uint) (models.User, error)
@@ -19,7 +19,9 @@ type UserRepository interface {
 	DeleteUser(db *sqlx.DB, user models.User) error
 }
 
-func CreateUser(db *sqlx.DB, user models.User) error {
+type UserRepository struct{}
+
+func (r *UserRepository) CreateUser(db *sqlx.DB, user models.User) error {
 	query := `
 		INSERT INTO users (username, email, first_name, last_name,  password_hash, created_at, updated_at, is_active)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -32,7 +34,7 @@ func CreateUser(db *sqlx.DB, user models.User) error {
 	return nil
 }
 
-func GetAllUsers(db *sqlx.DB) ([]models.User, error) {
+func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 	var users []models.User
 	query := `
 		SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active FROM users
@@ -52,6 +54,11 @@ func GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 			&user.ID,
 			&user.Username,
 			&user.Email,
+			&user.FirstName,
+			&user.LastName,
+			&user.PasswordHash,
+			&user.CreatedAt,
+			&user.UpdatedAt,
 			&user.IsActive)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -66,7 +73,7 @@ func GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 	return users, nil
 }
 
-func GetUserByID(db *sqlx.DB, id uint) (models.User, error) {
+func (r *UserRepository) GetUserByID(db *sqlx.DB, id uint) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -98,7 +105,7 @@ func GetUserByID(db *sqlx.DB, id uint) (models.User, error) {
 	return user, nil
 }
 
-func GetUserByUsername(db *sqlx.DB, username string) (models.User, error) {
+func (r *UserRepository) GetUserByUsername(db *sqlx.DB, username string) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -130,7 +137,7 @@ func GetUserByUsername(db *sqlx.DB, username string) (models.User, error) {
 	return user, nil
 }
 
-func GetUserByEmail(db *sqlx.DB, email string) (models.User, error) {
+func (r *UserRepository) GetUserByEmail(db *sqlx.DB, email string) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -162,7 +169,7 @@ func GetUserByEmail(db *sqlx.DB, email string) (models.User, error) {
 	return user, nil
 }
 
-func UpdateUser(db *sqlx.DB, user models.User) error {
+func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
 	query := `
 		UPDATE users
 		SET 
@@ -196,7 +203,7 @@ func UpdateUser(db *sqlx.DB, user models.User) error {
 	return nil
 }
 
-func DeleteUser(db *sqlx.DB, user models.User) error {
+func (r *UserRepository) DeleteUser(db *sqlx.DB, user models.User) error {
 	query := `
 		DELETE FROM users 
 		WHERE id = $1

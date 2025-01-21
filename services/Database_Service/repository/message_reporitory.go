@@ -5,14 +5,15 @@ import (
 	"errors"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/services/Database_Service/models"
+	"project/models"
 )
 
 type MessageRepository interface {
 	CreateMessage(db *sqlx.DB, message models.Message) error
+	GetMessageByID(db *sqlx.DB, id int) (models.Message, error)
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
-	GetMessagesByChatID(db *sqlx.DB, chatId string) ([]models.Message, error)
+	GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error)
 	UpdateMessage(db *sqlx.DB, message models.Message) error
 	DeleteMessage(db *sqlx.DB, message models.Message) error
 }
@@ -37,6 +38,37 @@ func CreateMessage(db *sqlx.DB, message models.Message) error {
 	}
 
 	return nil
+}
+
+func GetMessageByID(db *sqlx.DB, id int) (models.Message, error) {
+	var message models.Message
+
+	if id == 0 {
+		return models.Message{}, errors.New("Message ID is required")
+	}
+
+	query := `
+		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at  FROM messages WHERE id = $1
+	`
+
+	err := db.QueryRow(query, id).Scan(
+		&message.ID,
+		&message.ChatID,
+		&message.SenderID,
+		&message.Content,
+		&message.EncryptionAlgorithm,
+		&message.SentAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Printf("No message found with ID: %v", err)
+			return models.Message{}, err
+		}
+		log.Printf("Error while getting message by ID: %v", err)
+		return models.Message{}, err
+	}
+
+	return message, nil
 }
 
 func GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
@@ -110,7 +142,7 @@ func GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, e
 	return messages, nil
 }
 
-func GetMessagesByChatID(db *sqlx.DB, chatId string) ([]models.Message, error) {
+func GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
 	var messages []models.Message
 
 	query := `
