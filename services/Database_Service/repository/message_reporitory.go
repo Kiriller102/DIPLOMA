@@ -8,7 +8,7 @@ import (
 	"project/models"
 )
 
-type MessageRepository interface {
+type MessageRepositoryInterface interface {
 	CreateMessage(db *sqlx.DB, message models.Message) error
 	GetMessageByID(db *sqlx.DB, id int) (models.Message, error)
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
@@ -18,7 +18,9 @@ type MessageRepository interface {
 	DeleteMessage(db *sqlx.DB, message models.Message) error
 }
 
-func CreateMessage(db *sqlx.DB, message models.Message) error {
+type MessageRepository struct{}
+
+func (r *MessageRepository) CreateMessage(db *sqlx.DB, message models.Message) error {
 	query := `
 		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at) VALUES ($1, $2, $3, $4, $5) 
 	`
@@ -40,7 +42,7 @@ func CreateMessage(db *sqlx.DB, message models.Message) error {
 	return nil
 }
 
-func GetMessageByID(db *sqlx.DB, id int) (models.Message, error) {
+func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message, error) {
 	var message models.Message
 
 	if id == 0 {
@@ -71,7 +73,7 @@ func GetMessageByID(db *sqlx.DB, id int) (models.Message, error) {
 	return message, nil
 }
 
-func GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
+func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
 	var messages []models.Message
 	query := `
 		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at FROM messages
@@ -108,7 +110,7 @@ func GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
 	return messages, nil
 }
 
-func GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error) {
+func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error) {
 	var messages []models.Message
 
 	query := `
@@ -142,7 +144,7 @@ func GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, e
 	return messages, nil
 }
 
-func GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
+func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
 	var messages []models.Message
 
 	query := `
@@ -176,7 +178,7 @@ func GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
 	return messages, nil
 }
 
-func UpdateMessage(db *sqlx.DB, message models.Message) error {
+func (r *MessageRepository) UpdateMessage(db *sqlx.DB, message models.Message) error {
 	query := `
 		UPDATE messages
 		SET
@@ -195,7 +197,7 @@ func UpdateMessage(db *sqlx.DB, message models.Message) error {
 	return nil
 }
 
-func DeleteMessage(db *sqlx.DB, message models.Message) error {
+func (r *MessageRepository) DeleteMessage(db *sqlx.DB, message models.Message) error {
 	query := `
 		DELETE FROM messages
 		WHERE id = $1
