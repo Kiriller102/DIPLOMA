@@ -83,6 +83,10 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
+	if id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
 
 	var user models.User
 	if err = c.ShouldBindJSON(&user); err != nil {
