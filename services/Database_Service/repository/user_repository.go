@@ -3,7 +3,6 @@ package repository
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
 	"project/models"
@@ -223,7 +222,7 @@ func (r *UserRepository) DeleteUser(db *sqlx.DB, user models.User) error {
 
 	if rowsAffected == 0 {
 		log.Printf("user (ID:%d) not found", user.ID)
-		return fmt.Errorf("user (ID:%d) not found", user.ID)
+		return errors.New("user not found")
 	}
 
 	return nil
