@@ -3,6 +3,7 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
 	"project/models"
@@ -148,7 +149,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 	var messages []models.Message
 
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm FROM messages WHERE chat_id = $1
+		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at FROM messages WHERE chat_id = $1
 	`
 	rows, err := db.Query(query, chatId)
 	if err != nil {
@@ -217,7 +218,7 @@ func (r *MessageRepository) DeleteMessage(db *sqlx.DB, message models.Message) e
 
 	if rowsAffected == 0 {
 		log.Printf("message (ID: %d) not found", message.ID)
-		return errors.New("message not found")
+		return fmt.Errorf("message (ID: %d) not found", message.ID)
 	}
 
 	return nil
