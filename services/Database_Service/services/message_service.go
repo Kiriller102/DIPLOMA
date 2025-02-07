@@ -20,9 +20,9 @@ func NewMessageService(db *sqlx.DB) (*MessageService, error) {
 		return nil, errors.New("database is nil")
 	}
 
-	if db.Ping() != nil {
-		log.Printf("error connection to database")
-		return nil, errors.New("error connection to database")
+	if err := db.Ping(); err != nil {
+		log.Printf("error connection to database: %v", err)
+		return nil, err
 	}
 
 	return &MessageService{
