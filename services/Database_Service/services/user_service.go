@@ -100,16 +100,16 @@ func (s *UserService) UpdateUser(user models.User) (models.User, error) {
 	return user, nil
 }
 
-func (s *UserService) DeleteUser(user models.User) error {
-	if u, err := s.userRepo.GetUserByID(s.db, user.ID); err != nil {
+func (s *UserService) DeleteUser(id int) error {
+	if u, err := s.userRepo.GetUserByID(s.db, id); err != nil {
 		log.Printf("error get user by id")
 		return err
-	} else if u.ID != user.ID {
-		log.Printf("error user not found: %v", user)
+	} else if u.ID != id {
+		log.Printf("error user not found: %v", id)
 		return errors.New("user not found")
 	}
 
-	err := s.userRepo.DeleteUser(s.db, user)
+	err := s.userRepo.DeleteUserByID(s.db, id)
 	if err != nil {
 		log.Printf("error delete user")
 		return err

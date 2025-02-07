@@ -45,10 +45,6 @@ func (s *MessageService) CreateMessage(message models.Message) error {
 		return errors.New("message content is required")
 	}
 
-	//if message.EncryptionAlgorithm != models.EncryptionAlgorithmAES || message.EncryptionAlgorithm != models.EncryptionAlgorithmKuznechik: {
-	//	log.Printf("error: message.EncryptionAlgorithm type is invalid")
-	//	return models.Message{}, errors.New("message encryption algorithm is invalid")
-	//}
 	message.SentAt = time.Now()
 
 	err := s.messageRepo.CreateMessage(s.db, message)

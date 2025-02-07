@@ -10,11 +10,11 @@ import (
 )
 
 type ChatParticipantRepositoryInterface interface {
-	CreateParticipant(db sqlx.DB, participant models.ChatParticipant) error
-	GetParticipant(db sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error)
-	GetAllChatParticipants(db sqlx.DB, chatID string) (models.ChatParticipant, error)
-	DeleteAllParticipantsByChatID(db sqlx.DB, chatID int) error
-	DeleteParticipantByUserID(db sqlx.DB, participant models.ChatParticipant) error
+	CreateParticipant(db *sqlx.DB, participant models.ChatParticipant) error
+	GetParticipant(db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error)
+	GetAllChatParticipants(db *sqlx.DB, chatID int) ([]models.ChatParticipant, error)
+	DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error
+	DeleteParticipant(db *sqlx.DB, participant models.ChatParticipant) error
 }
 
 type ChatParticipantRepository struct{}
@@ -56,7 +56,7 @@ func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID i
 	rows, err := db.Queryx(query, chatID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("no participant found for chatID: %s", chatID)
+			log.Printf("no participant found for chatID: %d", chatID)
 			return []models.ChatParticipant{}, nil
 		}
 		log.Printf("error getting participants: %v", err.Error())
@@ -74,7 +74,7 @@ func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID i
 		err = rows.StructScan(&participant)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				log.Printf("no participant found for chatID: %s", chatID)
+				log.Printf("no participant found for chatID: %d", chatID)
 				return []models.ChatParticipant{}, nil
 			}
 			log.Printf("error scanning participant: %v", err.Error())
@@ -105,14 +105,14 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, c
 	}
 
 	if rowsAffected == 0 {
-		log.Printf("no participants found for chatID: %s", chatID)
-		return fmt.Errorf("no participants found for chatID: %s", chatID)
+		log.Printf("no participants found for chatID: %d", chatID)
+		return fmt.Errorf("no participants found for chatID: %d", chatID)
 	}
 
 	return nil
 }
 
-func (r *ChatParticipantRepository) DeleteParticipantByUserID(db *sqlx.DB, participant models.ChatParticipant) error {
+func (r *ChatParticipantRepository) DeleteParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
 	query := `
 		DELETE FROM chat_participants
 		WHERE user_id = $1 AND chat_id = $2

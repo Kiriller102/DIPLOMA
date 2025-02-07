@@ -85,7 +85,7 @@ func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.Ch
 		return errors.New("chat participant not found")
 	}
 
-	err := s.chatParticipantRepo.DeleteParticipantByUserID(s.db, participant)
+	err := s.chatParticipantRepo.DeleteParticipant(s.db, participant)
 	if err != nil {
 		log.Printf("error: u.GetParticipantByUserId error: %s", err)
 		return err

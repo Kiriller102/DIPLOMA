@@ -15,7 +15,7 @@ type UserRepositoryInterface interface {
 	GetUserByUsername(db *sqlx.DB, username string) (models.User, error)
 	GetUserByEmail(db *sqlx.DB, email string) (models.User, error)
 	UpdateUser(db *sqlx.DB, user models.User) error
-	DeleteUser(db *sqlx.DB, user models.User) error
+	DeleteUserByID(db *sqlx.DB, user models.User) error
 }
 
 type UserRepository struct{}
@@ -72,7 +72,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 	return users, nil
 }
 
-func (r *UserRepository) GetUserByID(db *sqlx.DB, id uint) (models.User, error) {
+func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -202,26 +202,26 @@ func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
 	return nil
 }
 
-func (r *UserRepository) DeleteUser(db *sqlx.DB, user models.User) error {
+func (r *UserRepository) DeleteUserByID(db *sqlx.DB, id int) error {
 	query := `
 		DELETE FROM users 
 		WHERE id = $1
 	`
 
-	result, err := db.Exec(query, user.ID)
+	result, err := db.Exec(query, id)
 	if err != nil {
-		log.Printf("error deleting user (ID:%d): %v", user.ID, err)
+		log.Printf("error deleting user (ID:%d): %v", id, err)
 		return err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("failed to check rows affected for user deletion (ID:%d): %v", user.ID, err)
+		log.Printf("failed to check rows affected for user deletion (ID:%d): %v", id, err)
 		return err
 	}
 
 	if rowsAffected == 0 {
-		log.Printf("user (ID:%d) not found", user.ID)
+		log.Printf("user (ID:%d) not found", id)
 		return errors.New("user not found")
 	}
 

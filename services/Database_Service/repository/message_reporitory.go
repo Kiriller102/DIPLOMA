@@ -16,7 +16,7 @@ type MessageRepositoryInterface interface {
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
 	GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error)
 	UpdateMessage(db *sqlx.DB, message models.Message) error
-	DeleteMessage(db *sqlx.DB, message models.Message) error
+	DeleteMessageByID(db *sqlx.DB, message models.Message) error
 }
 
 type MessageRepository struct{}
@@ -198,27 +198,27 @@ func (r *MessageRepository) UpdateMessage(db *sqlx.DB, message models.Message) e
 	return nil
 }
 
-func (r *MessageRepository) DeleteMessage(db *sqlx.DB, message models.Message) error {
+func (r *MessageRepository) DeleteMessageByID(db *sqlx.DB, id int) error {
 	query := `
 		DELETE FROM messages
 		WHERE id = $1
 	`
 
-	result, err := db.Exec(query, message.ID)
+	result, err := db.Exec(query, id)
 	if err != nil {
-		log.Printf("error deleting message (ID:%d): %v", message.ID, err)
+		log.Printf("error deleting message (ID:%d): %v", id, err)
 		return err
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		log.Printf("failed to check rows affected for messaeg deletion (ID: %d): %v", message.ID, err)
+		log.Printf("failed to check rows affected for messaeg deletion (ID: %d): %v", id, err)
 		return err
 	}
 
 	if rowsAffected == 0 {
-		log.Printf("message (ID: %d) not found", message.ID)
-		return fmt.Errorf("message (ID: %d) not found", message.ID)
+		log.Printf("message (ID: %d) not found", id)
+		return fmt.Errorf("message (ID: %d) not found", id)
 	}
 
 	return nil

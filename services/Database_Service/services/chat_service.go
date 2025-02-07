@@ -52,7 +52,7 @@ func (s *ChatService) CreateChat(chat models.Chat) error {
 	return nil
 }
 
-func (s *ChatService) GetChatById(id int) (models.Chat, error) {
+func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
 	chat, err := s.chatRepo.GetChatByID(s.db, id)
 	if err != nil {
 		log.Printf("error: chatRepo.GetChatByID error: %v", err)
@@ -82,6 +82,29 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 	err = s.chatRepo.UpdateChat(s.db, chat)
 	if err != nil {
 		log.Printf("error: chatRepo.UpdateChat error: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *ChatService) DeleteChatByID(id int) error {
+	if id == 0 {
+		log.Printf("error: DeleteChatByID id is zero")
+		return errors.New("chat id is required")
+	}
+
+	if c, err := s.chatRepo.GetChatByID(s.db, id); err != nil {
+		log.Printf("error: chatRepo.GetChatByID error: %v", err)
+		return err
+	} else if c == (models.Chat{}) {
+		log.Printf("error: no chat found with id: %d", id)
+		return errors.New("no chat found with id")
+	}
+
+	err := s.chatRepo.DeleteChatByID(s.db, id)
+	if err != nil {
+		log.Printf("error: chatRepo.DeleteChat error: %v", err)
 		return err
 	}
 
