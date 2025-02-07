@@ -61,7 +61,7 @@ func (uc *UserController) GetUser(c *gin.Context) {
 		}
 	}
 
-	user := models.User{ID: uint(id), Username: username, Email: email}
+	user := models.User{ID: id, Username: username, Email: email}
 	user, err := uc.userService.GetUser(user)
 	if err != nil {
 		var ErrUserNotFound = errors.New("user not found")
@@ -93,7 +93,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	user.ID = uint(id)
+	user.ID = id
 
 	_, err = uc.userService.UpdateUser(user)
 	if err != nil {
@@ -105,11 +105,12 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 
 func (uc *UserController) DeleteUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
 
-	err = uc.userService.DeleteUser(models.User{ID: uint(id)})
+	err = uc.userService.DeleteUser(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
