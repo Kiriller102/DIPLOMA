@@ -11,15 +11,15 @@ import (
 
 type ChatParticipantRepositoryInterface interface {
 	CreateParticipant(db sqlx.DB, participant models.ChatParticipant) error
-	GetParticipant(db sqlx.DB, chatID string) (models.ChatParticipant, error)
+	GetParticipant(db sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error)
+	GetAllChatParticipants(db sqlx.DB, chatID string) (models.ChatParticipant, error)
 	DeleteAllParticipantsByChatID(db sqlx.DB, chatID int) error
 	DeleteParticipantByUserID(db sqlx.DB, participant models.ChatParticipant) error
-	// InsertParticipant(db sqlx.DB, participant models.ChatParticipant) error
 }
 
 type ChatParticipantRepository struct{}
 
-func (r *ChatParticipantRepository) CreateParticipant(db sqlx.DB, participant models.ChatParticipant) error {
+func (r *ChatParticipantRepository) CreateParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
 	query := `
 		INSERT INTO chat_participants (chat_id, user_id, role, joined_at)
 		VALUES ($1, $2, $3, $4)
@@ -32,8 +32,23 @@ func (r *ChatParticipantRepository) CreateParticipant(db sqlx.DB, participant mo
 	return nil
 }
 
-func (r *ChatParticipantRepository) GetChatParticipant(db sqlx.DB, chatID int) ([]models.ChatParticipant, error) {
-	participants := []models.ChatParticipant{}
+func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error) {
+	query := `
+		SELECT * FROM chat_participants WHERE chat_id = $1 AND user_id = $2
+	`
+
+	var chPart models.ChatParticipant
+	err := db.QueryRow(query, participant.ChatID, participant.UserID).Scan(&chPart)
+	if err != nil {
+		log.Printf("error getting participant: %v", err.Error())
+		return models.ChatParticipant{}, err
+	}
+
+	return chPart, nil
+}
+
+func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID int) ([]models.ChatParticipant, error) {
+	var participants []models.ChatParticipant
 	query := `
 		SELECT user_id, role, joined_at FROM chat_participants WHERE chat_id = $1
 	`
@@ -71,7 +86,7 @@ func (r *ChatParticipantRepository) GetChatParticipant(db sqlx.DB, chatID int) (
 	return participants, nil
 }
 
-func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db sqlx.DB, chatID int) error {
+func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error {
 	query := `
 		DELETE FROM chat_participants 
 		WHERE chat_id = $1
@@ -97,7 +112,7 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db sqlx.DB, ch
 	return nil
 }
 
-func (r *ChatParticipantRepository) DeleteParticipantByUserID(db sqlx.DB, participant models.ChatParticipant) error {
+func (r *ChatParticipantRepository) DeleteParticipantByUserID(db *sqlx.DB, participant models.ChatParticipant) error {
 	query := `
 		DELETE FROM chat_participants
 		WHERE user_id = $1 AND chat_id = $2
@@ -125,8 +140,3 @@ func (r *ChatParticipantRepository) DeleteParticipantByUserID(db sqlx.DB, partic
 
 	return nil
 }
-
-//
-//func (r *ChatParticipantRepository) InsertParticipant(db sqlx.DB, participant models.ChatParticipant) error {
-//	//TODO create InsertParticipant()
-//}
