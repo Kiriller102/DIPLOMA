@@ -111,6 +111,7 @@ func (s *UserService) DeleteUser(user models.User) error {
 
 	err := s.userRepo.DeleteUser(s.db, user)
 	if err != nil {
+		log.Printf("error delete user")
 		return err
 	}
 
