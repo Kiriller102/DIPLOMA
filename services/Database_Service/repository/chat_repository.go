@@ -24,7 +24,7 @@ func (r *ChatRepository) CreateChat(db *sqlx.DB, chat models.Chat) error {
 
 	_, err := db.Exec(query, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt)
 	if err != nil {
-		log.Printf("error inserting chat: %v", err)
+		log.Printf("error creating chat: %v", err)
 		return err
 	}
 
