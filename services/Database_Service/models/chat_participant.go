@@ -10,8 +10,8 @@ const (
 )
 
 type ChatParticipant struct {
-	ChatID   int          `json:"chat_id"`
-	UserID   int          `json:"usersId"`
-	UserRole UserRoleType `json:"roleId"`
-	JoinedAt time.Time    `json:"joinedAt"`
+	ChatID   int          `json:"chat_id" db:"chat_id"`
+	UserID   int          `json:"users_id" db:"users_id"`
+	UserRole UserRoleType `json:"role_id" db:"role_id"`
+	JoinedAt time.Time    `json:"joined_at" db:"joined_at"`
 }
