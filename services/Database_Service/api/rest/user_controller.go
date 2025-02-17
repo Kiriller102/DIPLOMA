@@ -95,7 +95,7 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	}
 	user.ID = id
 
-	_, err = uc.userService.UpdateUser(user)
+	err = uc.userService.UpdateUser(user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -108,6 +108,9 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	}
+	if id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
 	}
 
 	err = uc.userService.DeleteUser(id)
