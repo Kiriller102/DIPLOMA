@@ -11,11 +11,11 @@ import (
 type UserRepositoryInterface interface {
 	CreateUser(db *sqlx.DB, user models.User) error
 	GetAllUsers(db *sqlx.DB) ([]models.User, error)
-	GetUserByID(db *sqlx.DB, id uint) (models.User, error)
+	GetUserByID(db *sqlx.DB, id int) (models.User, error)
 	GetUserByUsername(db *sqlx.DB, username string) (models.User, error)
 	GetUserByEmail(db *sqlx.DB, email string) (models.User, error)
 	UpdateUser(db *sqlx.DB, user models.User) error
-	DeleteUserByID(db *sqlx.DB, user models.User) error
+	DeleteUserByID(db *sqlx.DB, id int) error
 }
 
 type UserRepository struct{}
@@ -43,9 +43,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 		log.Printf("error getting users: %v", err)
 		return users, err
 	}
-	defer func(rows *sql.Rows) {
-		_ = rows.Close()
-	}(rows)
+	defer rows.Close()
 
 	for rows.Next() {
 		var user models.User
@@ -63,7 +61,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 			if errors.Is(err, sql.ErrNoRows) {
 				return users, nil
 			}
-			log.Fatalf("error getting users: %v", err)
+			log.Printf("error getting users: %v", err)
 			return []models.User{}, err
 		}
 		users = append(users, user)
@@ -80,17 +78,7 @@ func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {
    `
 
 	user := models.User{}
-	err := db.QueryRow(query, id).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.PasswordHash,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-		&user.IsActive,
-	)
+	err := db.Get(&user, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -112,21 +100,11 @@ func (r *UserRepository) GetUserByUsername(db *sqlx.DB, username string) (models
    `
 
 	user := models.User{}
-	err := db.QueryRow(query, username).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.PasswordHash,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-		&user.IsActive,
-	)
+	err := db.Get(&user, query, username)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("No user found with username %d", username)
+			log.Printf("No user found with username %s", username)
 			return models.User{}, nil
 		}
 		log.Printf("Error scanning row: %v", err)
@@ -144,21 +122,11 @@ func (r *UserRepository) GetUserByEmail(db *sqlx.DB, email string) (models.User,
    `
 
 	user := models.User{}
-	err := db.QueryRow(query, email).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.PasswordHash,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-		&user.IsActive,
-	)
+	err := db.Get(&user, query, email)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("No user found with email %d", email)
+			log.Printf("No user found with email %s", email)
 			return models.User{}, nil
 		}
 		log.Printf("Error scanning row: %v", err)
@@ -191,6 +159,7 @@ func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
 		user.LastName,
 		user.PasswordHash,
 		user.UpdatedAt,
+		user.IsActive,
 		user.ID,
 	)
 
