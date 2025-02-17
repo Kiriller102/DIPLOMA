@@ -78,8 +78,9 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 		log.Printf("error: no chat found with id: %d", chat.ID)
 		return errors.New("no chat found with id")
 	}
+	ch.Name = chat.Name
 
-	err = s.chatRepo.UpdateChat(s.db, chat)
+	err = s.chatRepo.UpdateChat(s.db, ch)
 	if err != nil {
 		log.Printf("error: chatRepo.UpdateChat error: %v", err)
 		return err

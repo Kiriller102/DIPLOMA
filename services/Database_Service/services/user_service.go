@@ -66,38 +66,84 @@ func (s *UserService) CreateUser(user models.User) error {
 	return nil
 }
 
-func (s *UserService) UpdateUser(user models.User) (models.User, error) {
-	user.UpdatedAt = time.Now()
-	if user.Email == "" || user.PasswordHash == "" {
-		return models.User{}, errors.New("email or password is empty")
+func (s *UserService) UpdateUser(user models.User) error {
+	//user.UpdatedAt = time.Now()
+	//if user.Email == "" || user.PasswordHash == "" {
+	//	return models.User{}, errors.New("email or password is empty")
+	//}
+	//
+	//if !isValidEmail(user.Email) {
+	//	log.Printf("error incorrect email: %v", user.Email)
+	//	return models.User{}, errors.New("invalid email")
+	//}
+	//
+	//if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
+	//	log.Printf("error get user by email")
+	//	return models.User{}, err
+	//} else if u.ID != user.ID {
+	//	log.Printf("error user already exists with email: %v", user.Email)
+	//}
+	//
+	//if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
+	//	log.Printf("error get user by username")
+	//	return models.User{}, err
+	//} else if u.ID != user.ID {
+	//	log.Printf("error user already exists with username: %v", user.Username)
+	//	return models.User{}, errors.New("user already exists with username: " + user.Username)
+	//}
+	//
+	//err := s.userRepo.UpdateUser(s.db, user)
+	//if err != nil {
+	//	return models.User{}, err
+	//}
+	//
+	//return user, nil
+
+	if user.ID == 0 {
+		log.Printf("error: user.ID is nil")
+		return errors.New("user id is required")
 	}
 
-	if !isValidEmail(user.Email) {
-		log.Printf("error incorrect email: %v", user.Email)
-		return models.User{}, errors.New("invalid email")
-	}
-
-	if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
-		log.Printf("error get user by email")
-		return models.User{}, err
-	} else if u.ID != user.ID {
-		log.Printf("error user already exists with email: %v", user.Email)
-	}
-
-	if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
-		log.Printf("error get user by username")
-		return models.User{}, err
-	} else if u.ID != user.ID {
-		log.Printf("error user already exists with username: %v", user.Username)
-		return models.User{}, errors.New("user already exists with username: " + user.Username)
-	}
-
-	err := s.userRepo.UpdateUser(s.db, user)
+	usr, err := s.userRepo.GetUserByID(s.db, user.ID)
 	if err != nil {
-		return models.User{}, err
+		log.Printf("error get user by id: %s", err.Error())
+		return err
 	}
 
-	return user, nil
+	if user.Username != "" {
+		usr.Username = user.Username
+	}
+
+	if user.PasswordHash != "" {
+		usr.PasswordHash = user.PasswordHash
+	}
+
+	if user.Email != "" {
+		if isValidEmail(user.Email) {
+			usr.Email = user.Email
+		} else {
+			log.Printf("error incorrect email: %v", user.Email)
+			return errors.New("invalid email")
+		}
+	}
+
+	if user.FirstName != "" {
+		usr.FirstName = user.FirstName
+	}
+
+	if user.LastName != "" {
+		usr.LastName = user.LastName
+	}
+
+	usr.UpdatedAt = time.Now()
+
+	err = s.userRepo.UpdateUser(s.db, usr)
+	if err != nil {
+		log.Printf("error update user: %s", err.Error())
+		return err
+	}
+
+	return nil
 }
 
 func (s *UserService) DeleteUser(id int) error {
