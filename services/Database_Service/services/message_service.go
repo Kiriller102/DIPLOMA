@@ -66,6 +66,16 @@ func (s *MessageService) GetMessagesByChatID(ChatID int) ([]models.Message, erro
 	return messages, nil
 }
 
+func (s *MessageService) GetMessageByID(messageID int) (models.Message, error) {
+	message, err := s.messageRepo.GetMessageByID(s.db, messageID)
+	if err != nil {
+		log.Printf("error: messageRepo.GetMessageByID error: %v", err)
+		return models.Message{}, err
+	}
+
+	return message, nil
+}
+
 func (s *MessageService) UpdateMessage(message models.Message) error {
 	if message.ID == 0 {
 		log.Printf("error: message.ID is nil (message.id: %d)", message.ID)
