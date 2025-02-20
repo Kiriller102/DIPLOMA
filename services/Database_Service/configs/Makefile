@@ -8,7 +8,7 @@ PROTO_NAMES=$(notdir $(PROTO_FILES:.proto=))
 
 $(OUT_DIR)/%/%.pb.go: $(PROTO_DIR)/%.proto
 	@mkdir -p $(OUT_DIR)/$*
-	$(PROTOC)   --proto_path=$(PROTO_DIR) --go_out=$(OUT_DIR)/$* --go_opt=paths=source_relative --go-grpc_out=$(OUT_DIR)/$* --go-grpc_opt=paths=source_relative $<
+	$(PROTOC) -I $(PROTO_DIR) -I ../../../googleapis --proto_path=$(PROTO_DIR) --go_out=$(OUT_DIR)/$* --go_opt=paths=source_relative --go-grpc_out=$(OUT_DIR)/$* --go-grpc_opt=paths=source_relative $<
 
 
 genProto: $(patsubst $(PROTO_DIR)/%.proto, $(OUT_DIR)/%/%.pb.go, $(PROTO_FILES))
