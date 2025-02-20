@@ -38,7 +38,7 @@ func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant mode
 	`
 
 	var chPart models.ChatParticipant
-	err := db.QueryRow(query, participant.ChatID, participant.UserID).Scan(&chPart)
+	err := db.Get(&chPart, query, participant.ChatID, participant.UserID)
 	if err != nil {
 		log.Printf("error getting participant: %v", err.Error())
 		return models.ChatParticipant{}, err

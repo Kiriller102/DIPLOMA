@@ -54,14 +54,8 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at  FROM messages WHERE id = $1
 	`
 
-	err := db.QueryRow(query, id).Scan(
-		&message.ID,
-		&message.ChatID,
-		&message.SenderID,
-		&message.Content,
-		&message.EncryptionAlgorithm,
-		&message.SentAt,
-	)
+	err := db.Get(message, query, id)
+
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			log.Printf("No message found with ID: %v", err)

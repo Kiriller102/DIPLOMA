@@ -37,13 +37,7 @@ func (r *ChatRepository) GetChatByID(db *sqlx.DB, id int) (models.Chat, error) {
 	`
 
 	var chat models.Chat
-	err := db.QueryRow(query, id).Scan(
-		&chat.ID,
-		&chat.Name,
-		&chat.Type,
-		&chat.CreatedBy,
-		&chat.CreatedAt,
-	)
+	err := db.Get(&chat, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

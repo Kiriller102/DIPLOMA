@@ -59,6 +59,10 @@ func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
 		return models.Chat{}, err
 	}
 
+	if (chat == models.Chat{}) {
+		return models.Chat{}, errors.New("chat not found")
+	}
+
 	return chat, nil
 }
 
