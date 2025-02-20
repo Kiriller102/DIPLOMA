@@ -21,7 +21,7 @@ func NewUserService(db *sqlx.DB) (*UserService, error) {
 		log.Printf("database is nil")
 		return nil, fmt.Errorf("database is nil")
 	}
-	if db.Ping() != nil {
+	if err := db.Ping(); err != nil {
 		log.Printf("error conecction to database")
 		return nil, fmt.Errorf("error conecction to database")
 	}
@@ -45,7 +45,7 @@ func (s *UserService) CreateUser(user models.User) error {
 	if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
 		log.Printf("error get user by email")
 		return err
-	} else if u != (models.User{}) {
+	} else if u.ID != 0 {
 		log.Printf("error user already exists with email: %v", user.Email)
 		return errors.New("user already exists with email: " + user.Email)
 	}
@@ -53,10 +53,12 @@ func (s *UserService) CreateUser(user models.User) error {
 	if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
 		log.Printf("error get user by username")
 		return err
-	} else if u != (models.User{}) {
+	} else if u.ID != 0 {
 		log.Printf("error user already exists with username: %v", user.Username)
 		return errors.New("user already exists with username: " + user.Username)
 	}
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
 
 	err := s.userRepo.CreateUser(s.db, user)
 	if err != nil {
@@ -192,8 +194,7 @@ func (s *UserService) GetUser(user models.User) (models.User, error) {
 	if u == (models.User{}) {
 		return models.User{}, errors.New("user not found")
 	}
-
-	return u, nil
+	return u, err
 }
 
 func (s *UserService) GetAllUsers() ([]models.User, error) {
