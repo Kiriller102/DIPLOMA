@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package chat_participant;
+option go_package = "project/api/grpc/chat_participant"; //TODO change it
+
+import "google/rpc/status.proto";
+import "google/protobuf/timestamp.proto";
+
+enum UserRoleType {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_MEMBER = 1;
+  USER_ROLE_ADMIN = 2;
+}
+
+message ChatParticipant {
+  int64 chat_id = 1;
+  int64 user_id = 2;
+  UserRoleType user_role = 3;
+  google.protobuf.Timestamp joined_at = 4;
+}
+
+message ChatParticipantList {
+  repeated ChatParticipant chat_participants = 1;
+}
+
+message CreateChatParticipantRequest {
+  ChatParticipant chat_participant = 1;
+}
+
+message CreateChatParticipantResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message DeleteChatParticipantRequest {
+  ChatParticipant chat_participant = 1;
+}
+
+message DeleteChatParticipantResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message DeleteAllChatParticipantsRequest {
+  int64 chat_id = 1;
+}
+
+message DeleteAllChatParticipantsResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message GetChatParticipantsByChatIDRequest {
+  int64 chat_id = 1;
+}
+
+message GetChatParticipantsByChatIDResponse {
+  oneof result {
+    ChatParticipantList chat_participants = 1;
+    google.rpc.Status error = 2;
+  }
+}
+
+service ChatParticipantService {
+  rpc CreateChatParticipant(CreateChatParticipantRequest) returns (CreateChatParticipantResponse);
+  rpc DeleteChatParticipant(DeleteChatParticipantRequest) returns (DeleteChatParticipantResponse);
+  rpc DeleteAllChatParticipants(DeleteAllChatParticipantsRequest) returns (DeleteAllChatParticipantsResponse);
+  rpc GetChatParticipants(GetChatParticipantsByChatIDRequest) returns (GetChatParticipantsByChatIDResponse);
+}

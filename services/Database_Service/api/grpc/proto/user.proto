@@ -1,9 +1,10 @@
 syntax = "proto3";
 
 package user;
-option go_package = "project/api/grpc/pb";
+option go_package = "project/api/grpc/user"; //TODO change go_package
 
 import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
 import "google/protobuf/empty.proto";
 
 message User {
@@ -22,20 +23,39 @@ message CreateUserRequest {
   User user = 1;
 }
 
+message CreateUserResponse {
+  optional google.rpc.Status error = 1;
+}
+
 message UpdateUserRequest {
   User user = 1;
+}
+
+message UpdateUserResponse {
+  optional google.rpc.Status error = 1;
 }
 
 message DeleteUserRequest {
   int64 id = 1;
 }
 
+message DeleteUserResponse {
+  optional google.rpc.Status error = 1;
+}
+
 message GetUserRequest {
-  User user = 1;
+  oneof identifier {
+    int64 id = 1;
+    string email = 2;
+    string username = 3;
+  }
 }
 
 message GetUserResponse {
-  User user = 1;
+  oneof result {
+    User user = 1;
+    google.rpc.Status error = 2;
+  }
 }
 
 message GetAllUsersResponse {
@@ -43,9 +63,9 @@ message GetAllUsersResponse {
 }
 
 service UserService {
-  rpc CreateUser(CreateUserRequest) returns (GetUserResponse);
-  rpc UpdateUser(UpdateUserRequest) returns (GetUserResponse);
-  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
   rpc GetAllUsers(google.protobuf.Empty) returns (GetAllUsersResponse);
 }
