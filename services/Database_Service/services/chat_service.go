@@ -20,7 +20,7 @@ func NewChatService(db *sqlx.DB) (*ChatService, error) {
 		return nil, errors.New("db is nil")
 	}
 
-	if db.Ping() != nil {
+	if err := db.Ping(); err != nil {
 		log.Printf("error connection to database")
 		return nil, errors.New("error connection to database")
 	}
