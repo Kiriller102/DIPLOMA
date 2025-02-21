@@ -54,7 +54,7 @@ func (s *UserGRPCService) CreateUser(ctx context.Context, req *userpb.CreateUser
 		}, err
 	}
 
-	return nil, nil
+	return &userpb.CreateUserResponse{}, nil
 }
 
 func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
@@ -191,7 +191,7 @@ func (s *UserGRPCService) UpdateUser(ctx context.Context, req *userpb.UpdateUser
 		}, err
 	}
 
-	return nil, nil
+	return &userpb.UpdateUserResponse{}, nil
 }
 
 func (s *UserGRPCService) DeleteUser(ctx context.Context, req *userpb.DeleteUserRequest) (*userpb.DeleteUserResponse, error) {
@@ -217,5 +217,5 @@ func (s *UserGRPCService) DeleteUser(ctx context.Context, req *userpb.DeleteUser
 		}, err
 	}
 
-	return nil, nil
+	return &userpb.DeleteUserResponse{}, nil
 }
