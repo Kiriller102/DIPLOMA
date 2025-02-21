@@ -4,7 +4,7 @@
 // - protoc             v5.29.2
 // source: chat_participant.proto
 
-package chat_participant
+package chatpartpb
 
 import (
 	context "context"

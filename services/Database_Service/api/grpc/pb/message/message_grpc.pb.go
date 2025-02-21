@@ -4,7 +4,7 @@
 // - protoc             v5.29.2
 // source: message.proto
 
-package message
+package messagepb
 
 import (
 	context "context"
