@@ -1,12 +1,11 @@
 syntax = "proto3";
 
 package message;
-option go_package = "project/Database-Service/proto/message;messagepb";
+option go_package = "project/api/grpc/pb/message;messagepb";
 
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 
-//ENUM for encryption algorithm
 enum EncryptionAlgorithmType {
   ENCRYPTION_ALGORITHM_UNSPECIFIED = 0;
   ENCRYPTION_ALGORITHM_AES = 1;

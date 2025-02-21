@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package user;
-option go_package = "project/Database-Service/proto/user;userpb";
+option go_package = "project/api/grpc/pb/user;userpb";
 
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
@@ -17,6 +17,10 @@ message User {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   bool is_active = 9;
+}
+
+message UserList {
+  repeated User users = 1;
 }
 
 message CreateUserRequest {
@@ -59,7 +63,10 @@ message GetUserResponse {
 }
 
 message GetAllUsersResponse {
-  repeated User users = 1;
+  oneof result {
+    UserList users = 1;
+    google.rpc.Status error = 2;
+  }
 }
 
 service UserService {

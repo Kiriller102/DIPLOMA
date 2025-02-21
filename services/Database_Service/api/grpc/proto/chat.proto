@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package chat;
 
-option go_package = "project/Database-Service/proto/chat;chatpb";
+option go_package = "project/api/grpc/pb/chat;chatpb";
 
 import "google/rpc/status.proto";
 import "google/protobuf/timestamp.proto";
@@ -50,7 +50,10 @@ message GetChatRequest {
 }
 
 message GetChatResponse {
-  optional google.rpc.Status error = 1;
+  oneof result {
+    Chat chat = 1;
+    google.rpc.Status error = 2;
+  }
 }
 
 service ChatService {

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package chat_participant;
-option go_package = "project/Database-Service/proto/chat_participant;chatpartpb";
+option go_package = "project/api/grpc/pb/chat_participant;chatpartpb";
 
 import "google/rpc/status.proto";
 import "google/protobuf/timestamp.proto";
