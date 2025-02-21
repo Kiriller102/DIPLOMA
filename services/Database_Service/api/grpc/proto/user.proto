@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package user;
-option go_package = "project/api/grpc/user"; //TODO change go_package
+option go_package = "project/Database-Service/proto/user;userpb";
 
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";

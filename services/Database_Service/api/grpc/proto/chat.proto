@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package chat;
 
-option go_package = "project/api/grpc/chat";  //TODO change it
+option go_package = "project/Database-Service/proto/chat;chatpb";
 
 import "google/rpc/status.proto";
 import "google/protobuf/timestamp.proto";
