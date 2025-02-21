@@ -5,8 +5,8 @@ import "time"
 type UserRoleType string
 
 const (
-	UserRoleMember UserRoleType = "Member"
-	UserRoleAdmin  UserRoleType = "Admin"
+	UserRoleMember UserRoleType = "member"
+	UserRoleAdmin  UserRoleType = "admin"
 )
 
 type ChatParticipant struct {

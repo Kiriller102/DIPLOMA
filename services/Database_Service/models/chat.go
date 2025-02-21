@@ -5,8 +5,8 @@ import "time"
 type ChatType string
 
 const (
-	ChatTypeGroup   ChatType = "Group"
-	ChatTypePrivate ChatType = "Private"
+	ChatTypeGroup   ChatType = "group"
+	ChatTypePrivate ChatType = "private"
 )
 
 type Chat struct {
