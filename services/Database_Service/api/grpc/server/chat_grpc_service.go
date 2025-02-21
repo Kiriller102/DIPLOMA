@@ -81,7 +81,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 		}, err
 	}
 
-	return nil, nil
+	return &chatpb.CreateChatResponse{}, nil
 }
 
 func (s *ChatGRPCService) GetChat(ctx context.Context, req *chatpb.GetChatRequest) (*chatpb.GetChatResponse, error) {
@@ -170,7 +170,7 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 		}, err
 	}
 
-	return nil, nil
+	return &chatpb.UpdateChatResponse{}, nil
 }
 
 func (s *ChatGRPCService) DeleteChat(ctx context.Context, req *chatpb.DeleteChatRequest) (*chatpb.DeleteChatResponse, error) {
@@ -195,7 +195,7 @@ func (s *ChatGRPCService) DeleteChat(ctx context.Context, req *chatpb.DeleteChat
 		}, err
 	}
 
-	return nil, nil
+	return &chatpb.DeleteChatResponse{}, nil
 }
 
 func convertChatType(t models.ChatType) chatpb.ChatType {
