@@ -47,7 +47,7 @@ message GetMessagesByChatIDRequest {
 
 message GetMessagesByChatIDResponse {
   oneof result {
-    MessageList message = 1;
+    MessageList messages = 1;
     google.rpc.Status error = 2;
   }
 }
