@@ -39,7 +39,7 @@ ENV CONFIG_PATH=/app/configs/config.yaml
 ENV DB_CONFIG_PATH=/app/configs/db.yaml
 ENV SECRETS_PATH=/app/secrets.env
 
-RUN ls -l /database_service_app/
-RUN chmod +x /database_service_app/database_service
+#RUN ls -l /database_service_app/
+#RUN chmod +x /database_service_app/database_service
 
 CMD ["./database_service"]

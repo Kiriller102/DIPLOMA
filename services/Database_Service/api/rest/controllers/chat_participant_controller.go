@@ -1,4 +1,4 @@
-package rest
+package controllers
 
 import (
 	"github.com/gin-gonic/gin"
@@ -33,7 +33,7 @@ func (cpc *ChatParticipantController) CreateChatParticipant(c *gin.Context) {
 }
 
 func (cpc *ChatParticipantController) GetChatParticipantsByChatID(c *gin.Context) {
-	chatID, err := strconv.Atoi(c.Param("chatID"))
+	chatID, err := strconv.Atoi(c.Param("chat_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -49,7 +49,7 @@ func (cpc *ChatParticipantController) GetChatParticipantsByChatID(c *gin.Context
 }
 
 func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Context) {
-	chatID, err := strconv.Atoi(c.Param("chatID"))
+	chatID, err := strconv.Atoi(c.Param("chat_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -59,7 +59,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 		return
 	}
 
-	userID, err := strconv.Atoi(c.Param("userID"))
+	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

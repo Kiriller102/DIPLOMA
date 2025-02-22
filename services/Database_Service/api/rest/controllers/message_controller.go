@@ -1,4 +1,4 @@
-package rest
+package controllers
 
 import (
 	"github.com/gin-gonic/gin"
@@ -38,7 +38,7 @@ func (mc *MessageController) CreateMessage(c *gin.Context) {
 }
 
 func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
-	chatID, err := strconv.Atoi(c.Param("ChatID"))
+	chatID, err := strconv.Atoi(c.Param("chat_id"))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
