@@ -79,7 +79,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 	c.JSON(http.StatusOK, gin.H{"chat_participant": nil})
 }
 
-func (cpc *ChatParticipantController) GetAllChatsIDsByUserID(c *gin.Context) {
+func (cpc *ChatParticipantController) GetAllChatsByUserID(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("user_id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -90,11 +90,11 @@ func (cpc *ChatParticipantController) GetAllChatsIDsByUserID(c *gin.Context) {
 		return
 	}
 
-	chatsIds, err := cpc.chatParticipantService.GetChatsIdsByUserID(userID)
+	chats, err := cpc.chatParticipantService.GetChatsIdsByUserID(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"chats_ids": chatsIds})
+	c.JSON(http.StatusOK, chats)
 }

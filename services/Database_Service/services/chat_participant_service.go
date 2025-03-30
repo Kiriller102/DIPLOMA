@@ -68,20 +68,20 @@ func (s *ChatParticipantService) GetAllChatParticipants(chatID int) ([]models.Ch
 
 // TODO написать GetChatsIdsByUserID для service а так же написать метод который будет возвращать массив из []chats{chat_id chat_name}
 
-func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]int, error) {
+func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]models.Chat, error) {
 	if userID == 0 {
 		log.Printf("error: ChatParticipant.UserID is zero")
-		return []int{}, errors.New("user id is required")
+		return []models.Chat{}, errors.New("user id is required")
 	}
 
-	ChatsIDs, err := s.chatParticipantRepo.GetAllChatsIDsByUserID(s.db, userID)
+	Chats, err := s.chatParticipantRepo.GetAllChatsByUserID(s.db, userID)
 
 	if err != nil {
 		log.Printf("error: GetChatsIdsByUserID error: %s", err)
-		return []int{}, err
+		return []models.Chat{}, err
 	}
 
-	return ChatsIDs, nil
+	return Chats, nil
 }
 
 func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.ChatParticipant) error {

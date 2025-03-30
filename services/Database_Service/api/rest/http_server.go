@@ -56,7 +56,7 @@ func NewHTTPServer(userController *controllers.UserController,
 	{
 		chatParticipantRoutes.POST("", ChatParticipantController.CreateChatParticipant)
 		chatParticipantRoutes.GET("/:chat_id", ChatParticipantController.GetChatParticipantsByChatID)
-		chatParticipantRoutes.GET("/chats/:user_id", ChatParticipantController.GetAllChatsIDsByUserID)
+		chatParticipantRoutes.GET("/chats/:user_id", ChatParticipantController.GetAllChatsByUserID)
 		chatParticipantRoutes.DELETE("/:chat_id/:user_id", ChatParticipantController.DeleteChatParticipantByUserID)
 	}
 

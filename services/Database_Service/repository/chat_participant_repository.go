@@ -86,35 +86,44 @@ func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID i
 	return participants, nil
 }
 
-func (r *ChatParticipantRepository) GetAllChatsIDsByUserID(db *sqlx.DB, userID int) ([]int, error) {
-	var ChatsIDs []int
+func (r *ChatParticipantRepository) GetAllChatsByUserID(db *sqlx.DB, userID int) ([]models.Chat, error) {
+	var Chats []models.Chat
 	query := `
-		SELECT chat_id FROM chat_participants WHERE user_id = $1
+		SELECT chats.*
+		FROM chats 
+		INNER JOIN chat_participants ON chat_participants.chat_id = chats.id 
+		WHERE chat_participants.user_id = $1
 	`
 
 	rows, err := db.Queryx(query, userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			log.Printf("no chats found for userID: %d", userID)
-			return []int{}, nil
+			return []models.Chat{}, nil
 		}
 		log.Printf("error getting chats: %v", err.Error())
-		return []int{}, err
+		return []models.Chat{}, err
 	}
 
 	for rows.Next() {
-		var chatID int
-		err = rows.Scan(&chatID)
+		var chat models.Chat
+		err = rows.Scan(
+			&chat.ID,
+			&chat.Name,
+			&chat.Type,
+			&chat.CreatedAt,
+			&chat.CreatedBy,
+		)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				log.Printf("error scanning participant: %d", userID)
-				return []int{}, nil
+				return []models.Chat{}, nil
 			}
 		}
-		ChatsIDs = append(ChatsIDs, chatID)
+		Chats = append(Chats, chat)
 	}
 
-	return ChatsIDs, nil
+	return Chats, nil
 }
 
 func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error {
