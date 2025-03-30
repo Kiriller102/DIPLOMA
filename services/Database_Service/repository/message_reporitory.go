@@ -47,7 +47,7 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 	var message models.Message
 
 	if id == 0 {
-		return models.Message{}, errors.New("Message ID is required")
+		return models.Message{}, errors.New("message ID is required")
 	}
 
 	query := `
@@ -143,7 +143,10 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 	var messages []models.Message
 
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at FROM messages WHERE chat_id = $1
+		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at 
+		FROM messages 
+		WHERE chat_id = $1
+		ORDER BY id 
 	`
 	rows, err := db.Query(query, chatId)
 	if err != nil {
