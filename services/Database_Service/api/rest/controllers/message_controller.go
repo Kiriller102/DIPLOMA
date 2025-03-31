@@ -51,25 +51,21 @@ func (mc *MessageController) LongPolling(c *gin.Context) {
 		return
 	}
 
-	timeout := time.After(30 * time.Second)          // максимальное время ожидания
-	ticker := time.NewTicker(100 * time.Millisecond) // интервал проверки новых сообщений
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-timeout:
-			// Если за время ожидания не пришли новые сообщения,
-			// отправляем пустой ответ или статус, что обновлений нет.
 			c.JSON(http.StatusNoContent, gin.H{})
 			return
 		case <-ticker.C:
-			// Получаем все сообщения чата
 			messages, err := mc.messageService.GetMessagesByChatID(chatID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting messages"})
 				return
 			}
-			// Если сообщения существуют и последнее сообщение новое (его ID больше, чем lastID клиента)
 			if len(messages) > 0 && messages[len(messages)-1].ID != lastID {
 				c.JSON(http.StatusOK, messages)
 				return
