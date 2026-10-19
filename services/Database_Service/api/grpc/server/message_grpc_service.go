@@ -2,14 +2,14 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
-	messagepb "project/api/grpc/pb/message"
-	"project/models"
-	"project/services"
+	messagepb "project/services/Database_Service/api/grpc/pb/message"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 )
 
 type MessageGRPCService struct {
@@ -29,7 +29,7 @@ func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.C
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: message required",
 			},
-		}, errors.New("invalid request: CreateMessageRequest is nil")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: CreateMessageRequest is nil")
 	}
 
 	message := models.Message{
@@ -39,6 +39,8 @@ func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.C
 	}
 
 	switch req.Message.EncryptionAlgorithm {
+	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_UNSPECIFIED:
+		message.EncryptionAlgorithm = ""
 	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_AES:
 		message.EncryptionAlgorithm = models.EncryptionAlgorithmAES
 	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_KUZNECHIK:
@@ -49,10 +51,10 @@ func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.C
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: EncryptionAlgorithmType is required",
 			},
-		}, errors.New("invalid request: EncryptionAlgorithmType is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: EncryptionAlgorithmType is required")
 	}
 
-	err := s.messageService.CreateMessage(message)
+	err := s.messageService.CreateMessage(&message)
 	if err != nil {
 		log.Println("grpc error creating message: ", err)
 		return &messagepb.CreateMessageResponse{
@@ -76,7 +78,7 @@ func (s *MessageGRPCService) GetMessage(ctx context.Context, req *messagepb.GetM
 					Message: "invalid request: id is required",
 				},
 			},
-		}, errors.New("invalid request: id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
 	message, err := s.messageService.GetMessageByID(int(req.Id))
@@ -105,14 +107,7 @@ func (s *MessageGRPCService) GetMessage(ctx context.Context, req *messagepb.GetM
 	case models.EncryptionAlgorithmKuznechik:
 		grpcMessage.EncryptionAlgorithm = messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_KUZNECHIK
 	default:
-		return &messagepb.GetMessageResponse{
-			Result: &messagepb.GetMessageResponse_Error{
-				Error: &status.Status{
-					Code:    int32(codes.InvalidArgument),
-					Message: "error getting message: incorrect encryption algorithm type",
-				},
-			},
-		}, errors.New("error getting message: incorrect encryption algorithm type")
+		grpcMessage.EncryptionAlgorithm = messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_UNSPECIFIED
 	}
 
 	return &messagepb.GetMessageResponse{
@@ -130,7 +125,7 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: message is required",
 			},
-		}, errors.New("invalid request: message is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: message is required")
 	}
 
 	message := models.Message{
@@ -139,6 +134,8 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 	}
 
 	switch req.Message.EncryptionAlgorithm {
+	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_UNSPECIFIED:
+		message.EncryptionAlgorithm = ""
 	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_AES:
 		message.EncryptionAlgorithm = models.EncryptionAlgorithmAES
 	case messagepb.EncryptionAlgorithmType_ENCRYPTION_ALGORITHM_KUZNECHIK:
@@ -149,7 +146,7 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 				Code:    int32(codes.InvalidArgument),
 				Message: "error: incorrect EncryptionAlgorithmType",
 			},
-		}, errors.New("invalid request: EncryptionAlgorithmType is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: EncryptionAlgorithmType is required")
 	}
 
 	err := s.messageService.UpdateMessage(message)
@@ -176,7 +173,7 @@ func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messa
 					Message: "invalid request: chat_id is required",
 				},
 			},
-		}, errors.New("invalid request: chat_id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
 	messages, err := s.messageService.GetMessagesByChatID(int(req.ChatId))

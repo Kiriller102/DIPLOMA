@@ -1,11 +1,10 @@
 package controllers
 
 import (
-	"errors"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"project/models"
-	"project/services"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 	"strconv"
 )
 
@@ -24,12 +23,13 @@ func (uc *UserController) CreateUser(c *gin.Context) {
 		return
 	}
 
-	err := uc.userService.CreateUser(user)
+	err := uc.userService.CreateUser(&user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
+	user.PasswordHash = ""
 	c.JSON(http.StatusCreated, gin.H{"user": user})
 }
 
@@ -38,6 +38,9 @@ func (uc *UserController) GetUsers(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
 		return
+	}
+	for i := range users {
+		users[i].PasswordHash = ""
 	}
 	c.JSON(http.StatusOK, users)
 }
@@ -56,25 +59,20 @@ func (uc *UserController) GetUser(c *gin.Context) {
 	if idParam != "" {
 		var err error
 		id, err = strconv.Atoi(idParam)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if err != nil || id <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "id must be positive"})
+			return
 		}
 	}
 
 	user := models.User{ID: id, Username: username, Email: email}
 	user, err := uc.userService.GetUser(user)
 	if err != nil {
-		var ErrUserNotFound = errors.New("user not found")
-
-		switch {
-		case errors.Is(err, ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
+		respondError(c, err)
 
 		return
 	}
+	user.PasswordHash = ""
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
@@ -82,8 +80,9 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	if id == 0 {
+	if id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
 		return
 	}
@@ -97,9 +96,15 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 
 	err = uc.userService.UpdateUser(user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
+	user, err = uc.userService.GetUser(models.User{ID: id})
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	user.PasswordHash = ""
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
@@ -108,14 +113,16 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	if id == 0 {
+	if id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
 	}
 
 	err = uc.userService.DeleteUser(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 

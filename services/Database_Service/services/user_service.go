@@ -1,14 +1,16 @@
 package services
 
 import (
-	"errors"
+	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
-	"project/repository"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/repository"
 	"regexp"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type UserService struct {
@@ -32,40 +34,21 @@ func NewUserService(db *sqlx.DB) (*UserService, error) {
 	}, nil
 }
 
-func (s *UserService) CreateUser(user models.User) error {
-	if user.Email == "" || user.PasswordHash == "" {
-		return errors.New("email or password is empty")
+func (s *UserService) CreateUser(user *models.User) error {
+	if user != nil {
+		user.Username = strings.TrimSpace(user.Username)
+		user.Email = strings.TrimSpace(user.Email)
 	}
-
-	if !isValidEmail(user.Email) {
-		log.Printf("error incorrect email: %v", user.Email)
-		return errors.New("invalid email")
+	if user == nil || user.Username == "" || utf8.RuneCountInString(user.Username) > 50 || !isValidEmail(user.Email) || len(user.Email) > 100 || user.PasswordHash == "" {
+		return fmt.Errorf("%w: username, valid email and password_hash are required", ErrInvalidInput)
 	}
-
-	if u, err := s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
-		log.Printf("error get user by email")
-		return err
-	} else if u.ID != 0 {
-		log.Printf("error user already exists with email: %v", user.Email)
-		return errors.New("user already exists with email: " + user.Email)
+	if utf8.RuneCountInString(user.FirstName) > 50 || utf8.RuneCountInString(user.LastName) > 50 || len(user.PasswordHash) > 255 {
+		return fmt.Errorf("%w: user field is too long", ErrInvalidInput)
 	}
-
-	if u, err := s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
-		log.Printf("error get user by username")
-		return err
-	} else if u.ID != 0 {
-		log.Printf("error user already exists with username: %v", user.Username)
-		return errors.New("user already exists with username: " + user.Username)
-	}
-	user.CreatedAt = time.Now()
-	user.UpdatedAt = time.Now()
-
-	err := s.userRepo.CreateUser(s.db, user)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	user.ID = 0
+	user.CreatedAt = time.Now().UTC()
+	user.UpdatedAt = user.CreatedAt
+	return s.userRepo.CreateUser(s.db, user)
 }
 
 func (s *UserService) UpdateUser(user models.User) error {
@@ -101,15 +84,19 @@ func (s *UserService) UpdateUser(user models.User) error {
 	//
 	//return user, nil
 
-	if user.ID == 0 {
+	if user.ID <= 0 {
 		log.Printf("error: user.ID is nil")
-		return errors.New("user id is required")
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
 	usr, err := s.userRepo.GetUserByID(s.db, user.ID)
 	if err != nil {
 		log.Printf("error get user by id: %s", err.Error())
 		return err
+	}
+
+	if usr.ID == 0 {
+		return sql.ErrNoRows
 	}
 
 	if user.Username != "" {
@@ -125,7 +112,7 @@ func (s *UserService) UpdateUser(user models.User) error {
 			usr.Email = user.Email
 		} else {
 			log.Printf("error incorrect email: %v", user.Email)
-			return errors.New("invalid email")
+			return fmt.Errorf("%w: invalid email", ErrInvalidInput)
 		}
 	}
 
@@ -154,7 +141,7 @@ func (s *UserService) DeleteUser(id int) error {
 		return err
 	} else if u.ID != id {
 		log.Printf("error user not found: %v", id)
-		return errors.New("user not found")
+		return sql.ErrNoRows
 	}
 
 	err := s.userRepo.DeleteUserByID(s.db, id)
@@ -174,13 +161,13 @@ func (s *UserService) GetUser(user models.User) (models.User, error) {
 	case user.Email != "":
 		if u, err = s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
 			log.Printf("error get user by email")
-		} else if u != (models.User{}) {
+		} else if u == (models.User{}) {
 			log.Printf("error no users exist with email: %v", user.Email)
 		}
 	case user.Username != "":
 		if u, err = s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
 			log.Printf("error get user by username")
-		} else if u != (models.User{}) {
+		} else if u == (models.User{}) {
 			log.Printf("error no users exist with username: %v", user.Username)
 		}
 	default:
@@ -191,8 +178,11 @@ func (s *UserService) GetUser(user models.User) (models.User, error) {
 		}
 	}
 
+	if err != nil {
+		return models.User{}, err
+	}
 	if u == (models.User{}) {
-		return models.User{}, errors.New("user not found")
+		return models.User{}, sql.ErrNoRows
 	}
 	return u, err
 }

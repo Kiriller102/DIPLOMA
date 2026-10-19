@@ -1,12 +1,16 @@
 package services
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
-	"project/repository"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/repository"
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type ChatService struct {
@@ -30,26 +34,20 @@ func NewChatService(db *sqlx.DB) (*ChatService, error) {
 	}, nil
 }
 
-func (s *ChatService) CreateChat(chat models.Chat) error {
-	if chat.Name == "" {
-		log.Printf("error: chat.Name is empty (chat.ID: %d", chat.ID)
-		return errors.New("chat.Name is empty")
+func (s *ChatService) CreateChat(chat *models.Chat) error {
+	if chat != nil {
+		chat.Name = strings.TrimSpace(chat.Name)
 	}
-
-	if chat.CreatedBy == 0 {
-		log.Printf("error: chat.CreatedBy is empty (chat.ID: %d)", chat.CreatedBy)
-		return errors.New("chat.CreatedBy is empty")
+	if chat == nil || chat.Name == "" || utf8.RuneCountInString(chat.Name) > 100 || chat.CreatedBy <= 0 || (chat.Type != models.ChatTypeGroup && chat.Type != models.ChatTypePrivate) {
+		return fmt.Errorf("%w: name, positive created_by and type group/private are required", ErrInvalidInput)
 	}
-
-	chat.CreatedAt = time.Now()
-
-	err := s.chatRepo.CreateChat(s.db, chat)
-	if err != nil {
-		log.Printf("error: chatRepo.CreateChat error: %v", err)
-		return err
+	for _, id := range chat.ParticipantIDs {
+		if id <= 0 {
+			return fmt.Errorf("%w: participant IDs must be positive", ErrInvalidInput)
+		}
 	}
-
-	return nil
+	chat.CreatedAt = time.Now().UTC()
+	return s.chatRepo.CreateChat(s.db, chat)
 }
 
 func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
@@ -59,17 +57,17 @@ func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
 		return models.Chat{}, err
 	}
 
-	if (chat == models.Chat{}) {
-		return models.Chat{}, errors.New("chat not found")
+	if chat.ID == 0 {
+		return models.Chat{}, sql.ErrNoRows
 	}
 
 	return chat, nil
 }
 
 func (s *ChatService) UpdateChat(chat models.Chat) error {
-	if chat.Name == "" {
+	if strings.TrimSpace(chat.Name) == "" || utf8.RuneCountInString(chat.Name) > 100 {
 		log.Printf("error: chat.Name is empty (chat.ID: %d)", chat.ID)
-		return errors.New("chat.Name is empty")
+		return fmt.Errorf("%w: chat.Name is empty", ErrInvalidInput)
 	}
 
 	ch, err := s.chatRepo.GetChatByID(s.db, chat.ID)
@@ -78,9 +76,9 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 		return err
 	}
 
-	if ch == (models.Chat{}) {
+	if ch.ID == 0 {
 		log.Printf("error: no chat found with id: %d", chat.ID)
-		return errors.New("no chat found with id")
+		return sql.ErrNoRows
 	}
 	ch.Name = chat.Name
 
@@ -94,17 +92,17 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 }
 
 func (s *ChatService) DeleteChatByID(id int) error {
-	if id == 0 {
+	if id <= 0 {
 		log.Printf("error: DeleteChatByID id is zero")
-		return errors.New("chat id is required")
+		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
 	if c, err := s.chatRepo.GetChatByID(s.db, id); err != nil {
 		log.Printf("error: chatRepo.GetChatByID error: %v", err)
 		return err
-	} else if c == (models.Chat{}) {
+	} else if c.ID == 0 {
 		log.Printf("error: no chat found with id: %d", id)
-		return errors.New("no chat found with id")
+		return sql.ErrNoRows
 	}
 
 	err := s.chatRepo.DeleteChatByID(s.db, id)

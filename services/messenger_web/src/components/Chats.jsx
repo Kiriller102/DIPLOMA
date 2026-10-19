@@ -1,100 +1,79 @@
-import React, { useState, useEffect } from 'react';
-import styled, {keyframes, css} from 'styled-components';
+import { useState, useEffect } from 'react';
+import styled from 'styled-components';
+import { api } from '../api';
 
-const ChatContainer = ({ isChatVisible, setChatID  }) => {
-    const [chatList, setChatList] = useState([]);
-    const [clickedChat, setClickedChat] = useState(null);
+const ChatContainer = ({ isChatVisible, setChatID, chatID, userID, users }) => {
+    const [chats, setChats] = useState([]);
+    const [name, setName] = useState('');
+    const [memberID, setMemberID] = useState('');
+    const [error, setError] = useState('');
+    const [pending, setPending] = useState(false);
 
     useEffect(() => {
-        const fetchChats = async () => {
+        const controller = new AbortController();
+        let timer;
+        setChats([]);
+        const refresh = async () => {
             try {
-                const response = await fetch('http://localhost:8080/chat_participant/chats/1');
-                const data = await response.json();
-
-                if (Array.isArray(data)) {
-                    setChatList(data);
-                } else {
-                    console.error('Fetched data is not an array:', data);
-                }
-            } catch (error) {
-                console.error('Error fetching chat list:', error);
+                const data = await api(`/chat_participant/chats/${userID}`, { signal: controller.signal });
+                if (!controller.signal.aborted) { setChats(data); setError(''); }
+            } catch (err) {
+                if (err.name !== 'AbortError') setError(err.message);
+            } finally {
+                if (!controller.signal.aborted) timer = setTimeout(refresh, 3000);
             }
         };
+        refresh();
+        return () => { controller.abort(); clearTimeout(timer); };
+    }, [userID]);
 
-        fetchChats();
-    }, []);
+    const createChat = async (event) => {
+        event.preventDefault();
+        if (!name.trim() || pending) return;
+        setPending(true);
+        try {
+            const { chat } = await api('/chat', {
+                method: 'POST', body: JSON.stringify({ name: name.trim(), type: 'group', created_by: userID,
+                    participant_ids: memberID ? [Number(memberID)] : [] }),
+            });
+            setChats(current => [...current.filter(item => item.id !== chat.id), chat]);
+            setChatID(chat.id);
+            setName('');
+            setError('');
+        } catch (err) { setError(err.message); }
+        finally { setPending(false); }
+    };
 
-    const handleChatClick = (chat) => {
-        console.log("Chat click:", chat);
-        setClickedChat(chat.id);
-        setChatID(chat.id);
-        setTimeout(() => setClickedChat(null), 300);
-    }
-
-    return (
-        <StyledChatBox isChatVisible={isChatVisible}>
-            <StyledChatList>
-                {chatList.map(chat => (
-                    <StyledChat
-                        key={chat.id}
-                        onClick={() => handleChatClick(chat)}
-                        isClicked={clickedChat === chat.id}
-                    >
-                        {/*<h1>{chat.id}</h1>*/}
-                        <h3> {chat.name}</h3>
-                        {/*<h3>{chat.name}</h3>*/}
-                        {/*<p>{chat.message}</p>*/}
-                    </StyledChat>
-                ))}
-            </StyledChatList>
-        </StyledChatBox>
-    );
+    return <StyledChatBox $hidden={isChatVisible}>
+        <h3>Мои чаты</h3>
+        <form onSubmit={createChat}>
+            <input aria-label="Название чата" placeholder="Название нового чата" maxLength={100} value={name} onChange={event => setName(event.target.value)} required />
+            <select aria-label="Участник нового чата" value={memberID} onChange={event => setMemberID(event.target.value)}>
+                <option value="">Только я</option>
+                {users.filter(user => user.id !== userID).map(user => <option key={user.id} value={user.id}>{user.first_name || user.username}</option>)}
+            </select>
+            <button disabled={pending || !name.trim()}>{pending ? 'Создание…' : 'Создать чат'}</button>
+        </form>
+        {error && <p role="alert">{error}</p>}
+        {!chats.length && <p>Создайте чат или дождитесь приглашения.</p>}
+        {chats.map(chat => <button className={chatID === chat.id ? 'chat selected' : 'chat'} key={chat.id} onClick={() => setChatID(chat.id)}>{chat.name}</button>)}
+    </StyledChatBox>;
 };
 
-const StyledChatBox = styled.div`
-    width: min(400px, calc(100vw - 60px));
-    background-color: #f0f0f0;
+const StyledChatBox = styled.aside`
+    display: ${({ $hidden }) => $hidden ? 'none' : 'block'};
+    width: min(360px, 45vw);
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background: #f0f0f0;
+    color: #20212a;
     border-radius: 15px;
-    padding: 20px;
-    margin: 10px 10px 10px calc((min(400px, 100vw - 60px) + 30px) * -1);
+    padding: 16px;
+    margin: 10px;
     overflow-y: auto;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-    transform: ${({isChatVisible}) => (isChatVisible ? 'translateX(0)' : 'translateX(+100%)')};
+    form { display: grid; gap: 8px; margin-bottom: 16px; }
+    input, select { min-width: 0; width: 100%; box-sizing: border-box; padding: 8px; }
+    .chat { display: block; width: 100%; margin-bottom: 8px; text-align: left; overflow-wrap: anywhere; }
+    .selected { border-color: #7079f0; }
 `;
-
-const StyledChatList = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-`;
-
-const clickAnimation = keyframes`
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-`;
-
-const StyledChat = styled.div`
-    background-color: white;
-    padding: 10px;
-    border-radius: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-    ${({ isClicked }) => isClicked && css`animation: ${clickAnimation} 0.3s;`}
-
-    h3 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: bold;
-        color: #1a1a1a;
-    }
-
-    p {
-        margin: 5px 0;
-        font-size: 14px;
-        color: #666;
-    }
-`;
-
 export default ChatContainer;

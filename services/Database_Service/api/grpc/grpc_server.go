@@ -2,31 +2,34 @@ package grpc
 
 import (
 	"context"
-	"google.golang.org/grpc"
-	"log"
+	"database/sql"
+	"errors"
+	"github.com/lib/pq"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net"
-	"os"
-	"os/signal"
-	chatpb "project/api/grpc/pb/chat"
-	chatpartpb "project/api/grpc/pb/chat_participant"
-	messagepb "project/api/grpc/pb/message"
-	userpb "project/api/grpc/pb/user"
-	grpc2 "project/api/grpc/server"
-	"project/services"
-	"sync"
-	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
+	chatpb "project/services/Database_Service/api/grpc/pb/chat"
+	chatpartpb "project/services/Database_Service/api/grpc/pb/chat_participant"
+	messagepb "project/services/Database_Service/api/grpc/pb/message"
+	userpb "project/services/Database_Service/api/grpc/pb/user"
+	grpc2 "project/services/Database_Service/api/grpc/server"
+	"project/services/Database_Service/services"
 )
 
-type GRPCServer struct {
-	server *grpc.Server
-	port   string
-}
+type GRPCServer struct{ server *grpc.Server }
 
-func NewGRPCServer(port string) *GRPCServer {
-	return &GRPCServer{
-		server: grpc.NewServer(),
-		port:   port,
-	}
+func NewGRPCServer() *GRPCServer {
+	server := grpc.NewServer(grpc.UnaryInterceptor(mapErrors))
+	h := health.NewServer()
+	h.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthpb.RegisterHealthServer(server, h)
+	reflection.Register(server)
+	return &GRPCServer{server: server}
 }
 
 func (s *GRPCServer) RegisterServices(userService *services.UserService,
@@ -45,30 +48,39 @@ func (s *GRPCServer) RegisterServices(userService *services.UserService,
 	chatpartpb.RegisterChatParticipantServiceServer(s.server, chatParticipantGRPCService)
 }
 
-func (s *GRPCServer) Run(wg *sync.WaitGroup) {
-	defer wg.Done()
+func (s *GRPCServer) Serve(listener net.Listener) error { return s.server.Serve(listener) }
+func (s *GRPCServer) Shutdown(ctx context.Context) {
+	done := make(chan struct{})
+	go func() { s.server.GracefulStop(); close(done) }()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		s.server.Stop()
+		<-done
+	}
+}
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-
-	go func() {
-		log.Println("Starting gRPS server on port: " + s.port)
-		listener, err := net.Listen("tcp", ":"+s.port)
-		if err != nil {
-			log.Fatalf("Failed to listen: %v", err)
+func mapErrors(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	response, err := handler(ctx, req)
+	if err == nil {
+		return response, nil
+	}
+	if status.Code(err) != codes.Unknown {
+		return nil, err
+	}
+	var pg *pq.Error
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, status.Error(codes.NotFound, "not found")
+	case errors.Is(err, services.ErrInvalidInput):
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case errors.As(err, &pg):
+		switch pg.Code {
+		case "23505":
+			return nil, status.Error(codes.AlreadyExists, "record already exists")
+		case "23503", "22P02", "22001", "23502":
+			return nil, status.Error(codes.InvalidArgument, "invalid fields or referenced record does not exist")
 		}
-
-		if err = s.server.Serve(listener); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
-		}
-	}()
-
-	<-quit
-	log.Println("Stopping gRPS server on port: " + s.port)
-
-	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	s.server.GracefulStop()
-	log.Println("Stopped gRPS server on port: " + s.port)
+	}
+	return nil, status.Error(codes.Internal, "internal server error")
 }

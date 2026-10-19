@@ -3,8 +3,8 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"project/models"
-	"project/services"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 	"strconv"
 )
 
@@ -28,9 +28,9 @@ func (cc *ChatController) CreateChat(c *gin.Context) {
 		return
 	}
 
-	err := cc.chatService.CreateChat(chat)
+	err := cc.chatService.CreateChat(&chat)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -43,14 +43,14 @@ func (cc *ChatController) GetChat(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if chatID == 0 {
+	if chatID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "chat id is required"})
 		return
 	}
 
 	chat, err := cc.chatService.GetChatByID(chatID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -72,20 +72,32 @@ func (cc *ChatController) UpdateChat(c *gin.Context) {
 	chat.ID = id
 
 	err = cc.chatService.UpdateChat(chat)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	chat, err = cc.chatService.GetChatByID(id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"chat": chat})
 }
 
 func (cc *ChatController) DeleteChat(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-	if id == 0 {
+	if id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "chat id is required"})
+		return
 	}
 
 	err = cc.chatService.DeleteChatByID(id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 

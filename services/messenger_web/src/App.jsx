@@ -1,6 +1,6 @@
-import React, {useState} from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
-import { useAuth0 } from '@auth0/auth0-react';
+import { api } from './api';
 import Background from './components/Background';
 import ChatContainer from './components/Chats';
 import Input from './components/Input';
@@ -12,7 +12,28 @@ import styled from 'styled-components';
 const App = () => {
     const [isChatVisible, setIsChatVisible] = useState(false);
     const [chatID, setChatID] = useState(null);
-    const {isLoading, isAuthenticated} = useAuth0();
+    const [users, setUsers] = useState([]);
+    const [userID, setUserID] = useState(null);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [reload, setReload] = useState(0);
+    useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        api('/users/all', { signal: controller.signal }).then(data => {
+            setUsers(data);
+            const saved = Number(sessionStorage.getItem('messenger-user'));
+            setUserID(data.some(user => user.id === saved) ? saved : (data[0]?.id ?? null));
+            setError('');
+        }).catch(err => { if (err.name !== 'AbortError') setError(err.message); })
+          .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+        return () => controller.abort();
+    }, [reload]);
+    const selectUser = (id) => {
+        setUserID(id);
+        setChatID(null);
+        sessionStorage.setItem('messenger-user', String(id));
+    };
 
     const toggleChatVisibility = () => {
         setIsChatVisible(!isChatVisible);
@@ -20,19 +41,20 @@ const App = () => {
 
 
 
-    if (isLoading) return <div>Loading...</div>;
-    // if (!isAuthenticated) return <div>Please log in to use the app.</div>;
+    if (loading) return <p role="status">Загрузка пользователей…</p>;
+    if (error) return <div role="alert">{error} <button onClick={() => setReload(value => value + 1)}>Повторить</button></div>;
+    if (!users.length) return <p>Пользователей пока нет. Включите DEMO_MODE=true или создайте пользователя через API.</p>;
 
     return (
         <StyledApp>
             <Background/>
-            <Header toggleChatVisibility={toggleChatVisibility} isChatVisible={isChatVisible}/>
+            <Header toggleChatVisibility={toggleChatVisibility} isChatVisible={isChatVisible} users={users} userID={userID} selectUser={selectUser}/>
             <MainContent>
-                <ChatContainer isChatVisible={isChatVisible} setChatID={setChatID}/>
-                <MessagesContainer isChatVisible={isChatVisible}>
-                    <Messages chatID={chatID}/>
+                <ChatContainer isChatVisible={isChatVisible} setChatID={setChatID} chatID={chatID} userID={userID} users={users}/>
+                <MessagesContainer>
+                    <Messages key={`${userID}-${chatID}`} chatID={chatID} userID={userID} users={users}/>
                     <InputContainer>
-                        <Input chatID={chatID}/>
+                        <Input key={`${userID}-${chatID}`} chatID={chatID} userID={userID}/>
                     </InputContainer>
                 </MessagesContainer>
             </MainContent>
@@ -57,15 +79,14 @@ const MainContent = styled.div`
 const MessagesContainer = styled.div`
     display: flex;
     flex-direction: column;
-    width: ${({isChatVisible}) => (isChatVisible ? 'calc(100vw - 20px)' : 'calc(100vw - 460px)')};
+    flex: 1;
+    min-width: 0;
+    margin: 10px;
     margin-left: auto;
     overflow: hidden;
     transition: flex 0.3s ease, width 0.3s ease;
     justify-content: flex-end;
 
-    @media (max-width: 768px) {
-        width: calc(100vw - 20px);
-    }
 `;
 
 const InputContainer = styled.div`

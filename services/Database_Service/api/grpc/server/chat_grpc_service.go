@@ -2,14 +2,14 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
-	chatpb "project/api/grpc/pb/chat"
-	"project/models"
-	"project/services"
+	chatpb "project/services/Database_Service/api/grpc/pb/chat"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 )
 
 type ChatGRPCService struct {
@@ -30,7 +30,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat is required",
 			},
-		}, errors.New("invalid request: chat is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat is required")
 	}
 
 	chat := models.Chat{
@@ -44,7 +44,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "chat name is required",
 			},
-		}, errors.New("chat name is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "chat name is required")
 	}
 
 	if chat.CreatedBy == 0 {
@@ -53,7 +53,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "chat created_by required",
 			},
-		}, errors.New("chat created_by required")
+		}, grpcstatus.Error(codes.InvalidArgument, "chat created_by required")
 	}
 
 	switch req.Chat.Type {
@@ -63,14 +63,14 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "chat type is required",
 			},
-		}, errors.New("chat type is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "chat type is required")
 	case chatpb.ChatType_CHAT_TYPE_GROUP:
 		chat.Type = models.ChatTypeGroup
 	case chatpb.ChatType_CHAT_TYPE_PRIVATE:
 		chat.Type = models.ChatTypePrivate
 	}
 
-	err := s.chatService.CreateChat(chat)
+	err := s.chatService.CreateChat(&chat)
 	if err != nil {
 		log.Printf("error: create chat error: %v", err)
 		return &chatpb.CreateChatResponse{
@@ -95,7 +95,7 @@ func (s *ChatGRPCService) GetChat(ctx context.Context, req *chatpb.GetChatReques
 					Message: "invalid request: chat_id is required",
 				},
 			},
-		}, errors.New("invalid request: chat_id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
 	chat, err := s.chatService.GetChatByID(int(req.Id))
@@ -132,7 +132,7 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat is required",
 			},
-		}, errors.New("invalid request: chat is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat is required")
 	}
 
 	if req.Chat.Name == "" {
@@ -142,7 +142,7 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "Chat name is required",
 			},
-		}, errors.New("chat name is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "chat name is required")
 	}
 
 	if req.Chat.Id == 0 {
@@ -152,7 +152,7 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "Chat id is required",
 			},
-		}, errors.New("chat id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "chat id is required")
 	}
 
 	chat := models.Chat{
@@ -181,7 +181,7 @@ func (s *ChatGRPCService) DeleteChat(ctx context.Context, req *chatpb.DeleteChat
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: id is required",
 			},
-		}, errors.New("invalid request: id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
 	err := s.chatService.DeleteChatByID(int(req.Id))

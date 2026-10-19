@@ -5,11 +5,11 @@ import (
 	"errors"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
+	"project/services/Database_Service/models"
 )
 
 type UserRepositoryInterface interface {
-	CreateUser(db *sqlx.DB, user models.User) error
+	CreateUser(db *sqlx.DB, user *models.User) error
 	GetAllUsers(db *sqlx.DB) ([]models.User, error)
 	GetUserByID(db *sqlx.DB, id int) (models.User, error)
 	GetUserByUsername(db *sqlx.DB, username string) (models.User, error)
@@ -20,12 +20,12 @@ type UserRepositoryInterface interface {
 
 type UserRepository struct{}
 
-func (r *UserRepository) CreateUser(db *sqlx.DB, user models.User) error {
+func (r *UserRepository) CreateUser(db *sqlx.DB, user *models.User) error {
 	query := `
 		INSERT INTO users (username, email, first_name, last_name,  password_hash, created_at, updated_at, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
 	`
-	_, err := db.Exec(query, user.Username, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt, user.IsActive)
+	err := db.QueryRowx(query, user.Username, user.Email, user.FirstName, user.LastName, user.PasswordHash, user.CreatedAt, user.UpdatedAt, user.IsActive).Scan(&user.ID)
 	if err != nil {
 		log.Printf("error inserting user: %v", err)
 		return err
@@ -34,7 +34,7 @@ func (r *UserRepository) CreateUser(db *sqlx.DB, user models.User) error {
 }
 
 func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
-	var users []models.User
+	users := make([]models.User, 0)
 	query := `
 		SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active FROM users
 	`
@@ -59,7 +59,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 			&user.IsActive)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return users, nil
+				return users, rows.Err()
 			}
 			log.Printf("error getting users: %v", err)
 			return []models.User{}, err
@@ -67,7 +67,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 		users = append(users, user)
 	}
 
-	return users, nil
+	return users, rows.Err()
 }
 
 func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {

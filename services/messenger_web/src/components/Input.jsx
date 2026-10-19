@@ -1,37 +1,27 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
+import { api } from '../api';
 
-const Input = ({ chatID }) => {
+const Input = ({ chatID, userID }) => {
     const [message, setMessage] = useState('');
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState('');
     const textareaRef = useRef(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (message.trim() && chatID) {
-            try {
-                const response = await fetch('http://localhost:8080/messages', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        content: encodeURIComponent(message),
-                        sender_id: 1,
-                        chat_id: chatID,
-                        encryption_algorithm: "AES"
-                    }),
-                });
-
-                if (response.ok) {
-                    setMessage('');
-                    textareaRef.current.style.height = "auto";
-                } else {
-                    console.error('Failed to send message:', response.statusText);
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-            }
-        }
+        if (!message.trim() || !chatID || !userID || pending) return;
+        setPending(true);
+        try {
+            await api('/messages', {
+                method: 'POST',
+                body: JSON.stringify({ content: message, sender_id: userID, chat_id: chatID }),
+            });
+            setMessage('');
+            setError('');
+            textareaRef.current.style.height = 'auto';
+        } catch (err) { setError(`Не удалось отправить сообщение: ${err.message}`); }
+        finally { setPending(false); }
     };
 
     const handleChange = (event) => {
@@ -41,7 +31,7 @@ const Input = ({ chatID }) => {
     };
 
     const handleKeyDown = (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             handleSubmit(event);
         }
@@ -50,16 +40,20 @@ const Input = ({ chatID }) => {
     return (
         <StyledWrapper>
             <div className="input-container">
+                {error && <span role="alert">{error}</span>}
                 <textarea
                     ref={textareaRef}
                     className="input"
-                    placeholder="Write a message..."
+                    aria-label="Сообщение"
+                    placeholder={chatID ? "Напишите сообщение…" : "Сначала выберите чат"}
+                    disabled={!chatID || pending}
+                    maxLength={16000}
                     value={message}
                     onChange={handleChange}
                     onKeyDown={handleKeyDown}
                     rows="1"
                 />
-                <button className="sendButton" onClick={handleSubmit}>
+                <button aria-label="Отправить сообщение" disabled={!chatID || pending || !message.trim()} className="sendButton" onClick={handleSubmit}>
                     <svg height={24} width={24} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M0 0h24v24H0z" fill="none"/>
                         <path d="M16.172 11l-5.364-5.364 1.414-1.414L20 12l-7.778 7.778-1.414-1.414L16.172 13H4v-2z" fill="currentColor"/>

@@ -3,32 +3,46 @@ package repository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
+	"project/services/Database_Service/models"
 )
 
 type ChatRepositoryInterface interface {
-	CreateChat(db *sqlx.DB, chat models.Chat) error
-	GetChatByID(db *sqlx.DB, id uint) (models.Chat, error)
+	CreateChat(db *sqlx.DB, chat *models.Chat) error
+	GetChatByID(db *sqlx.DB, id int) (models.Chat, error)
 	UpdateChat(db *sqlx.DB, chat models.Chat) error
-	DeleteChatByID(db *sqlx.DB, chat models.Chat) error
+	DeleteChatByID(db *sqlx.DB, id int) error
 }
 
 type ChatRepository struct{}
 
-func (r *ChatRepository) CreateChat(db *sqlx.DB, chat models.Chat) error {
-	query := `
-		INSERT INTO chats (name, type, created_by, created_at) VALUES ($1, $2, $3, $4)
-	`
-
-	_, err := db.Exec(query, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt)
+func (r *ChatRepository) CreateChat(db *sqlx.DB, chat *models.Chat) error {
+	tx, err := db.Beginx()
 	if err != nil {
-		log.Printf("error creating chat: %v", err)
 		return err
 	}
-
-	return nil
+	defer tx.Rollback()
+	err = tx.QueryRowx(`INSERT INTO chats (name, type, created_by, created_at)
+        VALUES ($1, $2, $3, $4) RETURNING id`, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt).Scan(&chat.ID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'admin')`, chat.ID, chat.CreatedBy)
+	if err != nil {
+		return err
+	}
+	for _, userID := range chat.ParticipantIDs {
+		if userID <= 0 {
+			return fmt.Errorf("invalid participant id")
+		}
+		_, err = tx.Exec(`INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`, chat.ID, userID)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (r *ChatRepository) GetChatByID(db *sqlx.DB, id int) (models.Chat, error) {

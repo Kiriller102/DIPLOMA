@@ -2,10 +2,11 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
-	"project/repository"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/repository"
 	"time"
 )
 
@@ -29,20 +30,23 @@ func NewChatParticipantService(db *sqlx.DB) (*ChatParticipantService, error) {
 	}, nil
 }
 
-func (s *ChatParticipantService) CreateChatParticipant(chPart models.ChatParticipant) error {
-	if chPart.UserID == 0 {
+func (s *ChatParticipantService) CreateChatParticipant(chPart *models.ChatParticipant) error {
+	if chPart == nil || chPart.UserID <= 0 {
 		log.Printf("error: ChatParticipant.UserID is zero")
-		return errors.New("user id is required")
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
-	if chPart.ChatID == 0 {
+	if chPart.ChatID <= 0 {
 		log.Printf("error: ChatParicipant.ChatID is zero")
-		return errors.New("chat id is required")
+		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
-	chPart.JoinedAt = time.Now()
+	if chPart.UserRole != models.UserRoleAdmin && chPart.UserRole != models.UserRoleMember {
+		return fmt.Errorf("%w: role must be admin or member", ErrInvalidInput)
+	}
+	chPart.JoinedAt = time.Now().UTC()
 
-	err := s.chatParticipantRepo.CreateParticipant(s.db, chPart)
+	err := s.chatParticipantRepo.CreateParticipant(s.db, *chPart)
 	if err != nil {
 		log.Printf("error: chatParticipant.CreateParticipant error: %s", err)
 		return err
@@ -52,9 +56,9 @@ func (s *ChatParticipantService) CreateChatParticipant(chPart models.ChatPartici
 }
 
 func (s *ChatParticipantService) GetAllChatParticipants(chatID int) ([]models.ChatParticipant, error) {
-	if chatID == 0 {
+	if chatID <= 0 {
 		log.Printf("error: ChatParticipant.ChatID is zero")
-		return []models.ChatParticipant{}, errors.New("chat id is required")
+		return []models.ChatParticipant{}, fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
 	chatParticipants, err := s.chatParticipantRepo.GetAllChatParticipants(s.db, chatID)
@@ -66,12 +70,10 @@ func (s *ChatParticipantService) GetAllChatParticipants(chatID int) ([]models.Ch
 	return chatParticipants, nil
 }
 
-// TODO написать GetChatsIdsByUserID для service а так же написать метод который будет возвращать массив из []chats{chat_id chat_name}
-
 func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]models.Chat, error) {
-	if userID == 0 {
+	if userID <= 0 {
 		log.Printf("error: ChatParticipant.UserID is zero")
-		return []models.Chat{}, errors.New("user id is required")
+		return []models.Chat{}, fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
 	Chats, err := s.chatParticipantRepo.GetAllChatsByUserID(s.db, userID)
@@ -85,14 +87,14 @@ func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]models.Chat,
 }
 
 func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.ChatParticipant) error {
-	if participant.UserID == 0 {
+	if participant.UserID <= 0 {
 		log.Printf("error: participant.UserID is zero")
-		return errors.New("user id is required")
+		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
-	if participant.ChatID == 0 {
+	if participant.ChatID <= 0 {
 		log.Printf("error: participant.ChatID is zero")
-		return errors.New("chat id is required")
+		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
 	if cp, err := s.chatParticipantRepo.GetParticipant(s.db, participant); err != nil {
@@ -113,9 +115,9 @@ func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.Ch
 }
 
 func (s *ChatParticipantService) DeleteAllParticipantsByChatID(chatID int) error {
-	if chatID == 0 {
+	if chatID <= 0 {
 		log.Printf("error: ChatParticipant.ChatID is zero")
-		return errors.New("chat id is required")
+		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
 	err := s.chatParticipantRepo.DeleteAllParticipantsByChatID(s.db, chatID)

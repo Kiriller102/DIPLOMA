@@ -1,0 +1,55 @@
+name: diploma
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-messenger}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-messenger-local}
+      POSTGRES_DB: ${DB_NAME:-messenger}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: services/Database_Service/docker/Dockerfile
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-messenger}
+      DB_PASSWORD: ${DB_PASSWORD:-messenger-local}
+      DB_NAME: ${DB_NAME:-messenger}
+      DB_SSLMODE: disable
+      HTTP_PORT: "8080"
+      GRPC_PORT: "5050"
+      DEMO_MODE: ${DEMO_MODE:-true}
+      GIN_MODE: release
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${GRPC_PORT:-5050}:5050"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: services/messenger_web
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

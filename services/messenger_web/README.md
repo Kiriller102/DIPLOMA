@@ -1,4 +1,17 @@
-# React + Vite
+# Интерфейс DIPLOMA
+
+Запуск всего проекта и ограничения деморежима описаны в [корневом README](../../README.md).
+
+Для разработки запустите Go API на `localhost:8080`, затем выполните в этой папке:
+
+```sh
+npm ci
+npm run dev
+```
+
+Vite проксирует `/api` к Go; в Docker это делает Nginx. Проверки: `npm run lint` и `npm run build`. Компоненты Auth0 сохранены как прототип, рабочий интерфейс использует выбор демопользователя.
+
+## Исходный шаблон React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

@@ -2,15 +2,15 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
-	userpb "project/api/grpc/pb/user"
-	"project/models"
-	"project/services"
+	userpb "project/services/Database_Service/api/grpc/pb/user"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 )
 
 type UserGRPCService struct {
@@ -31,7 +31,7 @@ func (s *UserGRPCService) CreateUser(ctx context.Context, req *userpb.CreateUser
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: user is required",
 			},
-		}, errors.New("error: CreateUserRequest is nil")
+		}, grpcstatus.Error(codes.InvalidArgument, "error: CreateUserRequest is nil")
 	}
 
 	user := models.User{
@@ -43,7 +43,7 @@ func (s *UserGRPCService) CreateUser(ctx context.Context, req *userpb.CreateUser
 		IsActive:     req.User.IsActive,
 	}
 
-	err := s.userService.CreateUser(user)
+	err := s.userService.CreateUser(&user)
 	if err != nil {
 		log.Printf("grpc error creating user: %v", err)
 		return &userpb.CreateUserResponse{
@@ -68,7 +68,7 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 					Message: "invalid request: user is required",
 				},
 			},
-		}, errors.New("error: GetUserRequest is nil")
+		}, grpcstatus.Error(codes.InvalidArgument, "error: GetUserRequest is nil")
 	}
 
 	var u models.User
@@ -88,7 +88,7 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 					Message: "invalid request",
 				},
 			},
-		}, errors.New("grpc error getting user")
+		}, grpcstatus.Error(codes.InvalidArgument, "grpc error getting user")
 	}
 
 	user, err := s.userService.GetUser(u)
@@ -107,15 +107,14 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 	return &userpb.GetUserResponse{
 		Result: &userpb.GetUserResponse_User{
 			User: &userpb.User{
-				Id:           int64(user.ID),
-				Username:     user.Username,
-				Email:        user.Email,
-				FirstName:    user.FirstName,
-				LastName:     user.LastName,
-				PasswordHash: user.PasswordHash,
-				CreatedAt:    timestamppb.New(user.CreatedAt),
-				UpdatedAt:    timestamppb.New(user.UpdatedAt),
-				IsActive:     user.IsActive,
+				Id:        int64(user.ID),
+				Username:  user.Username,
+				Email:     user.Email,
+				FirstName: user.FirstName,
+				LastName:  user.LastName,
+				CreatedAt: timestamppb.New(user.CreatedAt),
+				UpdatedAt: timestamppb.New(user.UpdatedAt),
+				IsActive:  user.IsActive,
 			},
 		},
 	}, nil
@@ -138,15 +137,14 @@ func (s *UserGRPCService) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*u
 	var grpcUsers []*userpb.User
 	for _, user := range users {
 		grpcUsers = append(grpcUsers, &userpb.User{
-			Id:           int64(user.ID),
-			Username:     user.Username,
-			Email:        user.Email,
-			FirstName:    user.FirstName,
-			LastName:     user.LastName,
-			PasswordHash: user.PasswordHash,
-			CreatedAt:    timestamppb.New(user.CreatedAt),
-			UpdatedAt:    timestamppb.New(user.UpdatedAt),
-			IsActive:     user.IsActive,
+			Id:        int64(user.ID),
+			Username:  user.Username,
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			CreatedAt: timestamppb.New(user.CreatedAt),
+			UpdatedAt: timestamppb.New(user.UpdatedAt),
+			IsActive:  user.IsActive,
 		})
 	}
 
@@ -167,7 +165,7 @@ func (s *UserGRPCService) UpdateUser(ctx context.Context, req *userpb.UpdateUser
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: user is required",
 			},
-		}, errors.New("invalid request: user is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: user is required")
 	}
 
 	user := models.User{
@@ -203,7 +201,7 @@ func (s *UserGRPCService) DeleteUser(ctx context.Context, req *userpb.DeleteUser
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: id is required",
 			},
-		}, errors.New("invalid request: id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
 	err := s.userService.DeleteUser(int(req.Id))

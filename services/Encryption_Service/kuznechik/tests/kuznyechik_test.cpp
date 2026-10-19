@@ -11,7 +11,7 @@ int main() {
     Kuznyechik kuznyechik(master_key.data());
 
     // auto open_text = StringToVec("1122334455667700ffeeddccbbaa9988");
-    auto open_text = StringToVec("48656c6c6f20576f726c6421");
+    auto open_text = StringToVec("48656c6c6f20576f726c64210000000000");
     std::cout << "Open text: " << DataToString(open_text.data()) << '\n';
 
     auto start = std::chrono::steady_clock::now();

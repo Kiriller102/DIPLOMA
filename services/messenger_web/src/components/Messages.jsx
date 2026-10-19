@@ -1,105 +1,50 @@
 import React, { useEffect, useState, useRef } from "react";
 import styled from "styled-components";
+import { api } from "../api";
 
-const Messages = ({ chatID }) => {
+const Messages = ({ chatID, userID, users }) => {
     const [messages, setMessages] = useState([]);
-    const [lastId, setLastId] = useState(0);
-    const messagesEndRef = useRef(null);
-    const currentChatIdRef = useRef(chatID);
-    const [showWelcomeMessage, setShowWelcomeMessage] = useState(true);
-
-    const fetchMessages = async (abortController) => {
+    const [error, setError] = useState('');
+    const endRef = useRef(null);
+    useEffect(() => {
         if (!chatID) return;
-
-        try {
-            const response = await fetch(`http://localhost:8080/messages/longpoll/${chatID}?last_id=${lastId}`, {
-                signal: abortController.signal,
-            });
-
-            if (response.status === 204) {
-                if (currentChatIdRef.current === chatID) {
-                    setTimeout(fetchMessages, 1000, abortController);
+        const controller = new AbortController();
+        let timer;
+        let lastID = 0;
+        const poll = async () => {
+            try {
+                const data = await api(`/messages/longpoll/${chatID}?last_id=${lastID}`, { signal: controller.signal });
+                if (controller.signal.aborted) return;
+                if (data?.length) {
+                    lastID = data[data.length - 1].id;
+                    setMessages(current => {
+                        const ids = new Set(current.map(message => message.id));
+                        return [...current, ...data.filter(message => !ids.has(message.id))];
+                    });
                 }
-                return;
+                setError('');
+                timer = setTimeout(poll, 50);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    setError(`Не удалось получить сообщения: ${err.message}. Повторяем подключение…`);
+                    timer = setTimeout(poll, 3000);
+                }
             }
-
-            const data = await response.json();
-
-            if (Array.isArray(data)) {
-
-                setMessages(data);
-
-
-                setLastId(data[data.length - 1]?.id || lastId);
-            }
-
-        } catch (error) {
-            if (error.name !== "AbortError") {
-                console.error("Ошибка при получении сообщений:", error);
-
-                setTimeout(fetchMessages, 5000, abortController);
-            }
-        }
-    };
-
-    useEffect(() => {
-        setShowWelcomeMessage(false);
-        currentChatIdRef.current = chatID;
-
-        setMessages([]);
-        setLastId(0);
-
-        const abortController = new AbortController();
-        fetchMessages(abortController);
-
-        const welcomeMessageTimeout = setTimeout(() => {
-            setShowWelcomeMessage(true);
-        }, 200);
-
-        return () => {
-            abortController.abort();
-            clearTimeout(welcomeMessageTimeout);
         };
+        poll();
+        return () => { controller.abort(); clearTimeout(timer); };
     }, [chatID]);
-
-    useEffect(() => {
-        const abortController = new AbortController();
-        fetchMessages(abortController);
-
-        return () => {
-            abortController.abort();
-        };
-    }, [lastId]);
-
-
-    useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-        }
-    }, [messages]);
-
-    return (
-        <StyledMessages>
-            {messages.length === 0  && showWelcomeMessage  ? (
-                <WelcomeMessage />
-            ) : (
-                messages.map((message) => (
-                    <div key={message.id} className="message">
-                        {decodeURIComponent(message.content)}
-                    </div>
-                ))
-            )}
-            <div ref={messagesEndRef} />
-        </StyledMessages>
-    );
+    useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+    return <StyledMessages aria-live="polite">
+        {error && <p role="alert">{error}</p>}
+        {!messages.length && <div className="welcome"><h3>{chatID ? 'Начните беседу' : 'Выберите чат'}</h3><p>Выберите другого пользователя во второй вкладке, чтобы проверить обмен сообщениями.</p></div>}
+        {messages.map(message => <div key={message.id} className={`message ${message.sender_id === userID ? 'own' : ''}`}>
+            <small>{users.find(user => user.id === message.sender_id)?.username || `Пользователь ${message.sender_id}`} · {new Date(message.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+            <div>{message.content}</div>
+        </div>)}
+        <div ref={endRef} />
+    </StyledMessages>;
 };
-
-const WelcomeMessage = () => (
-    <div className="welcome">
-        <h3>Добро пожаловать в чат!</h3>
-        <p>Начните беседу, отправив сообщение.</p>
-    </div>
-);
 
 const StyledMessages = styled.div`
     flex: auto;
@@ -111,6 +56,8 @@ const StyledMessages = styled.div`
     flex-direction: column;
     width: 100%;
 
+    .own { align-self: flex-end; }
+    small { color: #b9bdec; }
     .message {
         background: rgba(247, 197, 159, .1);
         color: rgb(255, 255, 255);

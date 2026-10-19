@@ -1,39 +1,40 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
+	"project/services/Database_Service/models"
 )
 
 type MessageRepositoryInterface interface {
-	CreateMessage(db *sqlx.DB, message models.Message) error
+	CreateMessage(db *sqlx.DB, message *models.Message) error
 	GetMessageByID(db *sqlx.DB, id int) (models.Message, error)
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
 	GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error)
 	UpdateMessage(db *sqlx.DB, message models.Message) error
-	DeleteMessageByID(db *sqlx.DB, message models.Message) error
+	DeleteMessageByID(db *sqlx.DB, id int) error
 }
 
 type MessageRepository struct{}
 
-func (r *MessageRepository) CreateMessage(db *sqlx.DB, message models.Message) error {
+func (r *MessageRepository) CreateMessage(db *sqlx.DB, message *models.Message) error {
 	query := `
-		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at) VALUES ($1, $2, $3, $4, $5) 
+		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at) VALUES ($1, $2, $3, NULLIF($4, '')::encryption_algorithm_type, $5) RETURNING id
 	`
 
-	_, err := db.Exec(
+	err := db.QueryRowx(
 		query,
 		message.ChatID,
 		message.SenderID,
 		message.Content,
 		message.EncryptionAlgorithm,
 		message.SentAt,
-	)
+	).Scan(&message.ID)
 
 	if err != nil {
 		log.Printf("Error while inserting message into database: %v", err)
@@ -51,10 +52,10 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 	}
 
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at  FROM messages WHERE id = $1
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at  FROM messages WHERE id = $1
 	`
 
-	err := db.Get(message, query, id)
+	err := db.Get(&message, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -69,9 +70,9 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 }
 
 func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
-	var messages []models.Message
+	messages := make([]models.Message, 0)
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at FROM messages
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at FROM messages
 	`
 
 	rows, err := db.Query(query)
@@ -79,9 +80,7 @@ func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error
 		log.Printf("Error while getting all messages: %v", err)
 		return nil, err
 	}
-	defer func(rows *sql.Rows) {
-		_ = rows.Close()
-	}(rows)
+	defer rows.Close()
 
 	for rows.Next() {
 		var message models.Message
@@ -94,7 +93,7 @@ func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error
 			&message.SentAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return messages, nil
+				return messages, rows.Err()
 			}
 			log.Printf("Error while getting all messages: %v", err)
 			return nil, err
@@ -102,14 +101,14 @@ func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error
 		messages = append(messages, message)
 	}
 
-	return messages, nil
+	return messages, rows.Err()
 }
 
 func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error) {
-	var messages []models.Message
+	messages := make([]models.Message, 0)
 
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm FROM messages WHERE sender_id = $1
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at FROM messages WHERE sender_id = $1
 	`
 	rows, err := db.Query(query, senderId)
 	if err != nil {
@@ -117,6 +116,8 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 		return nil, err
 	}
 
+	defer rows.Close()
+
 	for rows.Next() {
 		var message models.Message
 		err := rows.Scan(
@@ -128,7 +129,7 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 			&message.SentAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return messages, nil
+				return messages, rows.Err()
 			}
 			log.Printf("Error while getting all messages: %v", err)
 			return nil, err
@@ -136,17 +137,17 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 
 		messages = append(messages, message)
 	}
-	return messages, nil
+	return messages, rows.Err()
 }
 
 func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
-	var messages []models.Message
+	messages := make([]models.Message, 0)
 
 	query := `
-		SELECT id, chat_id, sender_id, content, encryption_algorithm, sent_at 
-		FROM messages 
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at
+		FROM messages
 		WHERE chat_id = $1
-		ORDER BY id 
+		ORDER BY id
 	`
 	rows, err := db.Query(query, chatId)
 	if err != nil {
@@ -154,6 +155,8 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 		return nil, err
 	}
 
+	defer rows.Close()
+
 	for rows.Next() {
 		var message models.Message
 		err := rows.Scan(
@@ -165,7 +168,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 			&message.SentAt)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return messages, nil
+				return messages, rows.Err()
 			}
 			log.Printf("Error while getting all messages: %v", err)
 			return nil, err
@@ -173,7 +176,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 
 		messages = append(messages, message)
 	}
-	return messages, nil
+	return messages, rows.Err()
 }
 
 func (r *MessageRepository) UpdateMessage(db *sqlx.DB, message models.Message) error {
@@ -181,7 +184,7 @@ func (r *MessageRepository) UpdateMessage(db *sqlx.DB, message models.Message) e
 		UPDATE messages
 		SET
 		    content = $1
-		WHERE 
+		WHERE
 		    id = $2
 	`
 
@@ -219,4 +222,12 @@ func (r *MessageRepository) DeleteMessageByID(db *sqlx.DB, id int) error {
 	}
 
 	return nil
+}
+
+func (r *MessageRepository) GetMessagesAfter(ctx context.Context, db *sqlx.DB, chatID, lastID int) ([]models.Message, error) {
+	messages := make([]models.Message, 0)
+	err := db.SelectContext(ctx, &messages, `SELECT id, chat_id, sender_id, content,
+        COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at
+        FROM messages WHERE chat_id = $1 AND id > $2 ORDER BY id LIMIT 100`, chatID, lastID)
+	return messages, err
 }

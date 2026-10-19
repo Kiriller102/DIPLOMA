@@ -3,8 +3,8 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"project/models"
-	"project/services"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 	"strconv"
 )
 
@@ -23,9 +23,9 @@ func (cpc *ChatParticipantController) CreateChatParticipant(c *gin.Context) {
 		return
 	}
 
-	err := cpc.chatParticipantService.CreateChatParticipant(chatParticipant)
+	err := cpc.chatParticipantService.CreateChatParticipant(&chatParticipant)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -41,7 +41,7 @@ func (cpc *ChatParticipantController) GetChatParticipantsByChatID(c *gin.Context
 
 	participants, err := cpc.chatParticipantService.GetAllChatParticipants(chatID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -54,7 +54,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if chatID == 0 {
+	if chatID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ChatID is required"})
 		return
 	}
@@ -64,7 +64,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if userID == 0 {
+	if userID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "UserID is required"})
 		return
 	}
@@ -72,7 +72,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 	chatPart := models.ChatParticipant{ChatID: chatID, UserID: userID}
 	err = cpc.chatParticipantService.DeleteParticipantByUserID(chatPart)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 
@@ -85,14 +85,14 @@ func (cpc *ChatParticipantController) GetAllChatsByUserID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if userID == 0 {
+	if userID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "userID is required"})
 		return
 	}
 
 	chats, err := cpc.chatParticipantService.GetChatsIdsByUserID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 

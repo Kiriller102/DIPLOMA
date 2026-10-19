@@ -2,14 +2,14 @@ package grpc
 
 import (
 	"context"
-	"errors"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
-	chatpartpb "project/api/grpc/pb/chat_participant"
-	"project/models"
-	"project/services"
+	chatpartpb "project/services/Database_Service/api/grpc/pb/chat_participant"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/services"
 )
 
 type ChatParticipantGRPCService struct {
@@ -29,7 +29,7 @@ func (s *ChatParticipantGRPCService) CreateChatParticipant(ctx context.Context, 
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat participant is required",
 			},
-		}, errors.New("invalid request: chat participant is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat participant is required")
 	}
 
 	chatParticipant := models.ChatParticipant{
@@ -47,10 +47,10 @@ func (s *ChatParticipantGRPCService) CreateChatParticipant(ctx context.Context, 
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat participant role is required",
 			},
-		}, errors.New("invalid request: chat participant role is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat participant role is required")
 	}
 
-	err := s.chatPartService.CreateChatParticipant(chatParticipant)
+	err := s.chatPartService.CreateChatParticipant(&chatParticipant)
 	if err != nil {
 		return &chatpartpb.CreateChatParticipantResponse{
 			Error: &status.Status{
@@ -71,7 +71,7 @@ func (s *ChatParticipantGRPCService) DeleteChatParticipant(ctx context.Context, 
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat participant is nil",
 			},
-		}, errors.New("invalid request: chat participant is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat participant is required")
 	}
 
 	cp := models.ChatParticipant{
@@ -100,7 +100,7 @@ func (s *ChatParticipantGRPCService) DeleteAllChatParticipants(ctx context.Conte
 				Code:    int32(codes.InvalidArgument),
 				Message: "invalid request: chat participant is required",
 			},
-		}, errors.New("invalid request: chat participant is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat participant is required")
 	}
 
 	err := s.chatPartService.DeleteAllParticipantsByChatID(int(req.ChatId))
@@ -127,7 +127,7 @@ func (s *ChatParticipantGRPCService) GetChatParticipants(ctx context.Context, re
 					Message: "invalid request: chat_id is required",
 				},
 			},
-		}, errors.New("invalid request: chat_id is required")
+		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
 	chatParticipants, err := s.chatPartService.GetAllChatParticipants(int(req.ChatId))

@@ -1,12 +1,12 @@
 import React from 'react';
 import styled from 'styled-components';
-import AuthButtons from "./AuthButtons.jsx";
 
-const Header = ({ toggleChatVisibility, isChatVisible }) => {
+
+const Header = ({ toggleChatVisibility, isChatVisible, users, userID, selectUser }) => {
     return (
         <StyledHeader>
             <div>
-                <input id="checkbox" type="checkbox" onClick={toggleChatVisibility} checked={isChatVisible} />
+                <input id="checkbox" type="checkbox" onChange={toggleChatVisibility} checked={isChatVisible} />
                 <label className="toggle" htmlFor="checkbox">
                     <div id="bar1" className="bars"/>
                     <div id="bar2" className="bars"/>
@@ -14,7 +14,12 @@ const Header = ({ toggleChatVisibility, isChatVisible }) => {
                 </label>
             </div>
             <h2>Messenger</h2>
-            <AuthButtons />
+            <label style={{ marginLeft: 'auto', marginRight: 16, fontSize: 14 }}>
+                <span>Демо · Пользователь</span>
+                <select aria-label="Пользователь" value={userID ?? ''} onChange={event => selectUser(Number(event.target.value))}>
+                    {users.map(user => <option key={user.id} value={user.id}>{user.first_name || user.username}</option>)}
+                </select>
+            </label>
         </StyledHeader>
     );
 }
@@ -30,9 +35,17 @@ const StyledHeader = styled.header`
     color: white;
     display: flex;
     align-items: center;
-    //justify-content: center;
+
     font-size: 20px;
     z-index: 100;
+
+    h2 { margin: 0; font-size: 22px; }
+    label select { max-width: 160px; min-width: 0; }
+    @media (max-width: 600px) {
+        label span { display: none; }
+        label select { max-width: 140px; }
+        h2 { font-size: 18px; }
+    }
 
     #checkbox {
         display: none;
@@ -79,16 +92,6 @@ const StyledHeader = styled.header`
     #checkbox:checked + .toggle {
         transform: rotate(-90deg);
     }
-`;
-
-const ToggleButton = styled.button`
-    padding: 10px 20px;
-    margin: 10px;
-    background-color: #fff;
-    color: #007bff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
 `;
 
 export default Header;

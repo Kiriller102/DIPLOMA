@@ -1,11 +1,14 @@
 package services
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
-	"project/repository"
+	"project/services/Database_Service/models"
+	"project/services/Database_Service/repository"
+	"strings"
 	"time"
 )
 
@@ -30,22 +33,35 @@ func NewMessageService(db *sqlx.DB) (*MessageService, error) {
 	}, nil
 }
 
-func (s *MessageService) CreateMessage(message models.Message) error {
-	if message.ChatID == 0 {
-		log.Printf("error: message.ChatID is nil (message.id: %d)", message.ID)
-		return errors.New("chat id is required")
+func (s *MessageService) CreateMessage(message *models.Message) error {
+	if message == nil || message.ChatID <= 0 {
+		log.Printf("error: message or chat ID is missing")
+		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
-	if message.SenderID == 0 {
+	if message.SenderID <= 0 {
 		log.Printf("error: message.SenderID is nil (message.id: %d)", message.ID)
-		return errors.New("sender id is required")
+		return fmt.Errorf("%w: sender id is required", ErrInvalidInput)
 	}
 
-	if message.Content == "" {
+	if strings.TrimSpace(message.Content) == "" || len(message.Content) > 65536 {
 		log.Printf("error: message.Content is nil (message.id: %d)", message.ID)
-		return errors.New("message content is required")
+		return fmt.Errorf("%w: message content is required", ErrInvalidInput)
 	}
 
-	message.SentAt = time.Now()
+	if len(message.Content) > 65536 {
+		return fmt.Errorf("%w: message exceeds 65536 bytes", ErrInvalidInput)
+	}
+	if message.EncryptionAlgorithm != "" && message.EncryptionAlgorithm != models.EncryptionAlgorithmAES && message.EncryptionAlgorithm != models.EncryptionAlgorithmKuznechik {
+		return fmt.Errorf("%w: unknown encryption_algorithm", ErrInvalidInput)
+	}
+	var member bool
+	if err := s.db.Get(&member, `SELECT EXISTS (SELECT 1 FROM chat_participants WHERE chat_id = $1 AND user_id = $2)`, message.ChatID, message.SenderID); err != nil {
+		return err
+	}
+	if !member {
+		return fmt.Errorf("%w: sender must be a chat participant", ErrInvalidInput)
+	}
+	message.SentAt = time.Now().UTC()
 
 	err := s.messageRepo.CreateMessage(s.db, message)
 	if err != nil {
@@ -77,9 +93,9 @@ func (s *MessageService) GetMessageByID(messageID int) (models.Message, error) {
 }
 
 func (s *MessageService) UpdateMessage(message models.Message) error {
-	if message.ID == 0 {
+	if message.ID <= 0 {
 		log.Printf("error: message.ID is nil (message.id: %d)", message.ID)
-		return errors.New("message id is required")
+		return fmt.Errorf("%w: message id is required", ErrInvalidInput)
 	}
 
 	msg, err := s.messageRepo.GetMessageByID(s.db, message.ID)
@@ -93,9 +109,9 @@ func (s *MessageService) UpdateMessage(message models.Message) error {
 		return errors.New("no message found with id")
 	}
 
-	if message.Content == "" {
+	if strings.TrimSpace(message.Content) == "" || len(message.Content) > 65536 {
 		log.Printf("error: message.Content is nil (message.id: %d)", message.ID)
-		return errors.New("message content is required")
+		return fmt.Errorf("%w: message content is required", ErrInvalidInput)
 	}
 
 	msg.Content = message.Content
@@ -108,4 +124,8 @@ func (s *MessageService) UpdateMessage(message models.Message) error {
 	}
 
 	return nil
+}
+
+func (s *MessageService) GetMessagesAfter(ctx context.Context, chatID, lastID int) ([]models.Message, error) {
+	return s.messageRepo.GetMessagesAfter(ctx, s.db, chatID, lastID)
 }

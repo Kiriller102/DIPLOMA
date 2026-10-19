@@ -1,88 +1,116 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
-	"github.com/spf13/viper"
+	"context"
+	"errors"
+	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
-	"project/api/grpc"
-	"project/api/rest"
-	"project/api/rest/controllers"
-	"project/repository"
-	"project/services"
-	"sync"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/joho/godotenv"
+	"project/services/Database_Service/api/grpc"
+	"project/services/Database_Service/api/rest"
+	"project/services/Database_Service/api/rest/controllers"
+	"project/services/Database_Service/migrations"
+	"project/services/Database_Service/repository"
+	"project/services/Database_Service/services"
 )
 
 func main() {
-	if err := godotenv.Load("configs/secrets.env"); err != nil {
-		log.Fatalf("error loading env variables, %s", err.Error())
+	if err := run(); err != nil {
+		log.Fatal(err)
 	}
-
-	if err := initConfig(); err != nil {
-		log.Fatalf("error, initialization configs, %s", err.Error())
-	}
-
-	db, err := repository.NewPostgresDB(repository.Config{
-		Host:     viper.GetString("db.host"),
-		Port:     viper.GetString("db.port"),
-		Username: viper.GetString("db.user"),
-		DBName:   viper.GetString("db.name"),
-		Password: os.Getenv("DB_PASSWORD"),
-		SSLMode:  viper.GetString("db.sslmode"),
-	})
-	if err != nil {
-		log.Fatalf("error, initialization dbs, %s", err.Error())
-	}
-	defer db.Close()
-
-	userService, err := services.NewUserService(db)
-	if err != nil {
-		log.Fatalf("error, initialization users, %s", err.Error())
-		return
-	}
-	messageService, err := services.NewMessageService(db)
-	if err != nil {
-		log.Fatalf("error, initialization messages, %s", err.Error())
-		return
-	}
-	chatService, err := services.NewChatService(db)
-	if err != nil {
-		log.Fatalf("error, initialization chats, %s", err.Error())
-		return
-	}
-	chatParticipantService, err := services.NewChatParticipantService(db)
-	if err != nil {
-		log.Fatalf("error, initialization chats participants, %s", err.Error())
-		return
-	}
-
-	userController := controllers.NewUserController(userService)
-	messageController := controllers.NewMessageController(messageService)
-	chatController := controllers.NewChatController(chatService)
-	chatParticipantController := controllers.NewChatParticipantController(chatParticipantService)
-
-	httpServer := rest.NewHTTPServer(userController, messageController, chatController, chatParticipantController)
-	gRPCServer := grpc.NewGRPCServer("5050")
-	gRPCServer.RegisterServices(userService, messageService, chatService, chatParticipantService)
-
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go httpServer.Run(&wg)
-
-	wg.Add(1)
-	go gRPCServer.Run(&wg)
-
-	wg.Wait()
 }
 
-func initConfig() error {
-	viper.AddConfigPath("configs")
-	viper.SetConfigName("config")
-	if err := viper.MergeInConfig(); err != nil {
-		log.Fatalf("error loading configs, %s", err.Error())
+func run() error {
+	for _, path := range []string{".env", "services/Database_Service/configs/secrets.env"} {
+		if err := godotenv.Load(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("load %s: %w", path, err)
+		}
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	db, err := repository.NewPostgresDB(repository.Config{
+		Host: env("DB_HOST", "localhost"), Port: env("DB_PORT", "5432"),
+		Username: env("DB_USER", "messenger"), Password: env("DB_PASSWORD", "messenger-local"),
+		DBName: env("DB_NAME", "messenger"), SSLMode: env("DB_SSLMODE", "disable"),
+	})
+	if err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
+	defer db.Close()
+	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := migrations.Apply(initCtx, db); err != nil {
 		return err
 	}
-	viper.SetConfigName("db")
-	return viper.MergeInConfig()
+	if env("DEMO_MODE", "false") == "true" {
+		log.Println("Demo mode: user selection does not authenticate requests")
+		if err := migrations.SeedDemo(initCtx, db); err != nil {
+			return err
+		}
+	}
+	users, err := services.NewUserService(db)
+	if err != nil {
+		return err
+	}
+	messages, err := services.NewMessageService(db)
+	if err != nil {
+		return err
+	}
+	chats, err := services.NewChatService(db)
+	if err != nil {
+		return err
+	}
+	participants, err := services.NewChatParticipantService(db)
+	if err != nil {
+		return err
+	}
+	httpServer := rest.NewHTTPServer(controllers.NewUserController(users), controllers.NewMessageController(messages),
+		controllers.NewChatController(chats), controllers.NewChatParticipantController(participants), db)
+	grpcServer := grpc.NewGRPCServer()
+	grpcServer.RegisterServices(users, messages, chats, participants)
+	httpListener, err := net.Listen("tcp", ":"+env("HTTP_PORT", "8080"))
+	if err != nil {
+		return err
+	}
+	defer httpListener.Close()
+	grpcListener, err := net.Listen("tcp", ":"+env("GRPC_PORT", "5050"))
+	if err != nil {
+		return err
+	}
+	defer grpcListener.Close()
+	errs := make(chan error, 2)
+	go func() { errs <- httpServer.Serve(httpListener) }()
+	go func() { errs <- grpcServer.Serve(grpcListener) }()
+	log.Printf("HTTP listening on %s; gRPC on %s", httpListener.Addr(), grpcListener.Addr())
+	var serveErr error
+	select {
+	case <-ctx.Done():
+	case serveErr = <-errs:
+		if errors.Is(serveErr, http.ErrServerClosed) {
+			serveErr = nil
+		}
+	}
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	// Cancel active long polls before draining the HTTP server.
+	httpServer.CancelPolls()
+	grpcServer.Shutdown(shutdownCtx)
+	if err := httpServer.Shutdown(shutdownCtx); err != nil && serveErr == nil {
+		serveErr = err
+	}
+	return serveErr
+}
+
+func env(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }

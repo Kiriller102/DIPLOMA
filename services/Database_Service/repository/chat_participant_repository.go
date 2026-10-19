@@ -1,12 +1,10 @@
 package repository
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
-	"project/models"
+	"project/services/Database_Service/models"
 )
 
 type ChatParticipantRepositoryInterface interface {
@@ -48,82 +46,16 @@ func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant mode
 }
 
 func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID int) ([]models.ChatParticipant, error) {
-	var participants []models.ChatParticipant
-	query := `
-		SELECT user_id, role, joined_at FROM chat_participants WHERE chat_id = $1
-	`
-
-	rows, err := db.Queryx(query, chatID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("no participant found for chatID: %d", chatID)
-			return []models.ChatParticipant{}, nil
-		}
-		log.Printf("error getting participants: %v", err.Error())
-		return []models.ChatParticipant{}, err
-	}
-	defer func(rows *sqlx.Rows) {
-		err = rows.Close()
-		if err != nil {
-			log.Fatalf("error closing rows: %v", err.Error())
-		}
-	}(rows)
-
-	for rows.Next() {
-		var participant models.ChatParticipant
-		err = rows.StructScan(&participant)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				log.Printf("no participant found for chatID: %d", chatID)
-				return []models.ChatParticipant{}, nil
-			}
-			log.Printf("error scanning participant: %v", err.Error())
-			return []models.ChatParticipant{}, err
-		}
-		participants = append(participants, participant)
-	}
-
-	return participants, nil
+	participants := make([]models.ChatParticipant, 0)
+	err := db.Select(&participants, `SELECT chat_id, user_id, role, joined_at FROM chat_participants WHERE chat_id = $1 ORDER BY user_id`, chatID)
+	return participants, err
 }
 
 func (r *ChatParticipantRepository) GetAllChatsByUserID(db *sqlx.DB, userID int) ([]models.Chat, error) {
-	var Chats []models.Chat
-	query := `
-		SELECT chats.*
-		FROM chats 
-		INNER JOIN chat_participants ON chat_participants.chat_id = chats.id 
-		WHERE chat_participants.user_id = $1
-	`
-
-	rows, err := db.Queryx(query, userID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			log.Printf("no chats found for userID: %d", userID)
-			return []models.Chat{}, nil
-		}
-		log.Printf("error getting chats: %v", err.Error())
-		return []models.Chat{}, err
-	}
-
-	for rows.Next() {
-		var chat models.Chat
-		err = rows.Scan(
-			&chat.ID,
-			&chat.Name,
-			&chat.Type,
-			&chat.CreatedAt,
-			&chat.CreatedBy,
-		)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				log.Printf("error scanning participant: %d", userID)
-				return []models.Chat{}, nil
-			}
-		}
-		Chats = append(Chats, chat)
-	}
-
-	return Chats, nil
+	chats := make([]models.Chat, 0)
+	err := db.Select(&chats, `SELECT c.id, c.name, c.type, c.created_by, c.created_at FROM chats c
+        JOIN chat_participants p ON p.chat_id = c.id WHERE p.user_id = $1 ORDER BY c.id`, userID)
+	return chats, err
 }
 
 func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error {
@@ -132,7 +64,7 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, c
 		WHERE chat_id = $1
 	`
 
-	result, err := db.Exec(query)
+	result, err := db.Exec(query, chatID)
 	if err != nil {
 		log.Printf("error deleting participants: %v", err.Error())
 		return err

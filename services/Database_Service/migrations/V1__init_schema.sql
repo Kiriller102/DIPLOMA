@@ -58,4 +58,4 @@ CREATE TABLE notification
     context    VARCHAR(255),
     read       boolean,
     created_at TIMESTAMP         NOT NULL
-)
+);

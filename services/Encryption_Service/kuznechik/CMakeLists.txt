@@ -1,6 +1,13 @@
-cmake_minimum_required(VERSION 3.26)
-project(CryptoProject VERSION 2.2)
-
+cmake_minimum_required(VERSION 3.16)
+project(CryptoProject VERSION 2.2 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
-
-add_executable(Kuznyechik tests/kuznyechik_test.cpp src/kuznechik/kuznechik.cpp)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_library(kuznechik src/kuznechik/kuznechik.cpp)
+add_executable(Kuznyechik tests/kuznyechik_test.cpp)
+target_link_libraries(Kuznyechik PRIVATE kuznechik)
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(known_answer_test tests/known_answer_test.cpp)
+    target_link_libraries(known_answer_test PRIVATE kuznechik)
+    add_test(NAME kuznechik_known_answer COMMAND known_answer_test)
+endif()

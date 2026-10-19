@@ -1,15 +1,19 @@
 #include "kuznechik.h"
+#include <stdexcept>
 
 std::vector<short> StringToVec(const std::string& val) {
-    static std::string symbols = "0123456789abcdef";
+    static const std::string symbols = "0123456789abcdef";
+    if (val.size() % 2 != 0) throw std::invalid_argument("hex input must have even length");
     std::vector<short> result;
     result.reserve(val.size() / 2);
-    for (int i = 0; i < val.size(); i += 2) {
-        auto pos_1 = symbols.find(val[i]);
-        auto pos_2 = symbols.find(val[i + 1]);
-        result.push_back(pos_1 * 16 + pos_2);
+    for (std::size_t i = 0; i < val.size(); i += 2) {
+        auto high = symbols.find(val[i]);
+        auto low = symbols.find(val[i + 1]);
+        if (high == std::string::npos || low == std::string::npos) throw std::invalid_argument("invalid lowercase hex input");
+        result.push_back(static_cast<short>(high * 16 + low));
     }
-    return result;}
+    return result;
+}
 
 std::string DataToString(const short* values) {
     static std::string symbols = "0123456789abcdef";
@@ -162,7 +166,7 @@ short Kuznyechik::Linear(short* a) {
 }
 
 void Kuznyechik::LSX(uint64_t k1, uint64_t k2) {
-    static uint64_t result[2];
+    uint64_t result[2];
     result[0] = k1;
     result[1] = k2;
     for (short i = 0; i < 16; ++i) {
@@ -217,7 +221,7 @@ void Kuznyechik::SmallLSX(short* a, const short* k) {
 }
 
 void Kuznyechik::LS(short* a) {
-    static uint64_t result[2];
+    uint64_t result[2];
     result[0] = result[1] = 0;
     for (short i = 0; i < 16; ++i) {
         l_temp_a[i] = permutation[a[i]];
