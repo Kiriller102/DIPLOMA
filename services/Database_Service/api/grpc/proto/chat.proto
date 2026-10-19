@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package chat;
+
+option go_package = "project/api/grpc/pb/chat;chatpb";
+
+import "google/rpc/status.proto";
+import "google/protobuf/timestamp.proto";
+
+enum ChatType {
+  CHAT_TYPE_UNSPECIFIED = 0;
+  CHAT_TYPE_GROUP = 1;
+  CHAT_TYPE_PRIVATE = 2;
+}
+
+message Chat {
+  int64 id = 1;
+  string name = 2;
+  ChatType type = 3;
+  int64 created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateChatRequest {
+  Chat chat = 1;
+}
+
+message CreateChatResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message UpdateChatRequest {
+  Chat chat = 1;
+}
+
+message UpdateChatResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message DeleteChatRequest {
+  int64 id = 1;
+}
+
+message DeleteChatResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message GetChatRequest {
+  int64 id = 1;
+}
+
+message GetChatResponse {
+  oneof result {
+    Chat chat = 1;
+    google.rpc.Status error = 2;
+  }
+}
+
+service ChatService {
+  rpc CreateChat(CreateChatRequest) returns (CreateChatResponse);
+  rpc UpdateChat(UpdateChatRequest) returns (UpdateChatResponse);
+  rpc DeleteChat(DeleteChatRequest) returns (DeleteChatResponse);
+  rpc GetChat(GetChatRequest) returns (GetChatResponse);
+}

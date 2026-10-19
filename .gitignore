@@ -13,6 +13,7 @@ bower_components/
 vendor/
 
 # Build outputs
+cmake-build-debug/
 dist/
 build/
 out/
@@ -24,7 +25,6 @@ out/
 *.bak
 
 # System files
-.idea/
 .vscode/
 *.sublime-workspace
 *.sublime-project

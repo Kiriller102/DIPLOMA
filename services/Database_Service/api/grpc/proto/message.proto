@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package message;
+option go_package = "project/api/grpc/pb/message;messagepb";
+
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+
+enum EncryptionAlgorithmType {
+  ENCRYPTION_ALGORITHM_UNSPECIFIED = 0;
+  ENCRYPTION_ALGORITHM_AES = 1;
+  ENCRYPTION_ALGORITHM_KUZNECHIK = 2;
+}
+
+message Message {
+  int64 id = 1;
+  int64 chat_id = 2;
+  int64 sender_id = 3;
+  string context = 4;
+  EncryptionAlgorithmType encryption_algorithm = 5;
+  google.protobuf.Timestamp sent_ad = 6;
+}
+
+message MessageList {
+  repeated Message message = 1;
+}
+
+message CreateMessageRequest {
+  Message message = 1;
+}
+
+message CreateMessageResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message UpdateMessageRequest {
+  Message message = 1;
+}
+
+message UpdateMessageResponse {
+  optional google.rpc.Status error = 1;
+}
+
+message GetMessagesByChatIDRequest {
+  int64 chat_id = 1;
+}
+
+message GetMessagesByChatIDResponse {
+  oneof result {
+    MessageList messages = 1;
+    google.rpc.Status error = 2;
+  }
+}
+
+message GetMessageRequest {
+  int64 id = 1;
+}
+
+message GetMessageResponse {
+  oneof result {
+    Message message = 1;
+    google.rpc.Status error = 2;
+  }
+}
+
+service MessageService {
+  rpc CreateMessage(CreateMessageRequest) returns (CreateMessageResponse);
+  rpc UpdateMessage(UpdateMessageRequest) returns (UpdateMessageResponse);
+  rpc GetMessagesByChatID(GetMessagesByChatIDRequest) returns (GetMessagesByChatIDResponse);
+  rpc GetMessage(GetMessageRequest) returns (GetMessageResponse);
+}
