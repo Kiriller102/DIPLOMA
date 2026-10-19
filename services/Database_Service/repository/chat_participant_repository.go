@@ -86,6 +86,46 @@ func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID i
 	return participants, nil
 }
 
+func (r *ChatParticipantRepository) GetAllChatsByUserID(db *sqlx.DB, userID int) ([]models.Chat, error) {
+	var Chats []models.Chat
+	query := `
+		SELECT chats.*
+		FROM chats 
+		INNER JOIN chat_participants ON chat_participants.chat_id = chats.id 
+		WHERE chat_participants.user_id = $1
+	`
+
+	rows, err := db.Queryx(query, userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Printf("no chats found for userID: %d", userID)
+			return []models.Chat{}, nil
+		}
+		log.Printf("error getting chats: %v", err.Error())
+		return []models.Chat{}, err
+	}
+
+	for rows.Next() {
+		var chat models.Chat
+		err = rows.Scan(
+			&chat.ID,
+			&chat.Name,
+			&chat.Type,
+			&chat.CreatedAt,
+			&chat.CreatedBy,
+		)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				log.Printf("error scanning participant: %d", userID)
+				return []models.Chat{}, nil
+			}
+		}
+		Chats = append(Chats, chat)
+	}
+
+	return Chats, nil
+}
+
 func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error {
 	query := `
 		DELETE FROM chat_participants 

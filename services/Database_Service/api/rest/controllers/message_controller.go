@@ -6,6 +6,7 @@ import (
 	"project/models"
 	"project/services"
 	"strconv"
+	"time"
 )
 
 type MessageController struct {
@@ -35,6 +36,42 @@ func (mc *MessageController) CreateMessage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"message": message})
+}
+
+func (mc *MessageController) LongPolling(c *gin.Context) {
+	chatID, err := strconv.Atoi(c.Param("chat_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "chat_id required"})
+		return
+	}
+	lastIDStr := c.Query("last_id")
+	lastID, err := strconv.Atoi(lastIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр last_id обязателен"})
+		return
+	}
+
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			c.JSON(http.StatusNoContent, gin.H{})
+			return
+		case <-ticker.C:
+			messages, err := mc.messageService.GetMessagesByChatID(chatID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Error getting messages"})
+				return
+			}
+			if len(messages) > 0 && messages[len(messages)-1].ID != lastID {
+				c.JSON(http.StatusOK, messages)
+				return
+			}
+		}
+	}
 }
 
 func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {

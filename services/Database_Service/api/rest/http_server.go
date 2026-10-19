@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"errors"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
@@ -24,6 +25,8 @@ func NewHTTPServer(userController *controllers.UserController,
 	ChatParticipantController *controllers.ChatParticipantController) *HTTPServer {
 	router := gin.Default()
 
+	router.Use(cors.Default()) //TODO change before publish
+
 	userRoutes := router.Group("/users")
 	{
 		userRoutes.POST("", userController.CreateUser)
@@ -36,6 +39,7 @@ func NewHTTPServer(userController *controllers.UserController,
 	messageRoutes := router.Group("/messages")
 	{
 		messageRoutes.POST("", messageController.CreateMessage)
+		messageRoutes.GET("longpoll/:chat_id", messageController.LongPolling)
 		messageRoutes.GET("/:chat_id", messageController.GetMessagesByChatID)
 		messageRoutes.PUT("/:id", messageController.UpdateMessage)
 	}
@@ -52,6 +56,7 @@ func NewHTTPServer(userController *controllers.UserController,
 	{
 		chatParticipantRoutes.POST("", ChatParticipantController.CreateChatParticipant)
 		chatParticipantRoutes.GET("/:chat_id", ChatParticipantController.GetChatParticipantsByChatID)
+		chatParticipantRoutes.GET("/chats/:user_id", ChatParticipantController.GetAllChatsByUserID)
 		chatParticipantRoutes.DELETE("/:chat_id/:user_id", ChatParticipantController.DeleteChatParticipantByUserID)
 	}
 
