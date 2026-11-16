@@ -3,17 +3,19 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 	"strconv"
 )
 
 type ChatController struct {
+	access      *auth.Service
 	chatService *services.ChatService
 }
 
-func NewChatController(chatService *services.ChatService) *ChatController {
-	return &ChatController{chatService: chatService}
+func NewChatController(chatService *services.ChatService, access *auth.Service) *ChatController {
+	return &ChatController{chatService: chatService, access: access}
 }
 
 func (cc *ChatController) CreateChat(c *gin.Context) {
@@ -28,6 +30,7 @@ func (cc *ChatController) CreateChat(c *gin.Context) {
 		return
 	}
 
+	chat.CreatedBy = cc.access.EffectiveUserID(c.Request.Context(), chat.CreatedBy)
 	err := cc.chatService.CreateChat(&chat)
 	if err != nil {
 		respondError(c, err)
@@ -48,6 +51,10 @@ func (cc *ChatController) GetChat(c *gin.Context) {
 		return
 	}
 
+	if err := cc.access.RequireChat(c.Request.Context(), chatID, false); err != nil {
+		respondError(c, err)
+		return
+	}
 	chat, err := cc.chatService.GetChatByID(chatID)
 	if err != nil {
 		respondError(c, err)
@@ -71,6 +78,10 @@ func (cc *ChatController) UpdateChat(c *gin.Context) {
 	}
 	chat.ID = id
 
+	if err := cc.access.RequireChat(c.Request.Context(), id, true); err != nil {
+		respondError(c, err)
+		return
+	}
 	err = cc.chatService.UpdateChat(chat)
 	if err != nil {
 		respondError(c, err)
@@ -95,6 +106,10 @@ func (cc *ChatController) DeleteChat(c *gin.Context) {
 		return
 	}
 
+	if err := cc.access.RequireChat(c.Request.Context(), id, true); err != nil {
+		respondError(c, err)
+		return
+	}
 	err = cc.chatService.DeleteChatByID(id)
 	if err != nil {
 		respondError(c, err)

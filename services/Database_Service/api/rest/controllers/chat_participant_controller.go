@@ -3,17 +3,19 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 	"strconv"
 )
 
 type ChatParticipantController struct {
+	access                 *auth.Service
 	chatParticipantService *services.ChatParticipantService
 }
 
-func NewChatParticipantController(chatParticipantService *services.ChatParticipantService) *ChatParticipantController {
-	return &ChatParticipantController{chatParticipantService: chatParticipantService}
+func NewChatParticipantController(chatParticipantService *services.ChatParticipantService, access *auth.Service) *ChatParticipantController {
+	return &ChatParticipantController{chatParticipantService: chatParticipantService, access: access}
 }
 
 func (cpc *ChatParticipantController) CreateChatParticipant(c *gin.Context) {
@@ -23,6 +25,10 @@ func (cpc *ChatParticipantController) CreateChatParticipant(c *gin.Context) {
 		return
 	}
 
+	if err := cpc.access.RequireChat(c.Request.Context(), chatParticipant.ChatID, true); err != nil {
+		respondError(c, err)
+		return
+	}
 	err := cpc.chatParticipantService.CreateChatParticipant(&chatParticipant)
 	if err != nil {
 		respondError(c, err)
@@ -39,6 +45,10 @@ func (cpc *ChatParticipantController) GetChatParticipantsByChatID(c *gin.Context
 		return
 	}
 
+	if err := cpc.access.RequireChat(c.Request.Context(), chatID, false); err != nil {
+		respondError(c, err)
+		return
+	}
 	participants, err := cpc.chatParticipantService.GetAllChatParticipants(chatID)
 	if err != nil {
 		respondError(c, err)
@@ -70,6 +80,10 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 	}
 
 	chatPart := models.ChatParticipant{ChatID: chatID, UserID: userID}
+	if err := cpc.access.RequireRemoveParticipant(c.Request.Context(), chatID, userID); err != nil {
+		respondError(c, err)
+		return
+	}
 	err = cpc.chatParticipantService.DeleteParticipantByUserID(chatPart)
 	if err != nil {
 		respondError(c, err)
@@ -90,6 +104,10 @@ func (cpc *ChatParticipantController) GetAllChatsByUserID(c *gin.Context) {
 		return
 	}
 
+	if err := cpc.access.RequireSelf(c.Request.Context(), userID); err != nil {
+		respondError(c, err)
+		return
+	}
 	chats, err := cpc.chatParticipantService.GetChatsIdsByUserID(userID)
 	if err != nil {
 		respondError(c, err)

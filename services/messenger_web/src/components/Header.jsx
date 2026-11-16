@@ -2,7 +2,7 @@ import React from 'react';
 import styled from 'styled-components';
 
 
-const Header = ({ toggleChatVisibility, isChatVisible, users, userID, selectUser }) => {
+const Header = ({ toggleChatVisibility, isChatVisible, user, logout, signingOut }) => {
     return (
         <StyledHeader>
             <div>
@@ -14,12 +14,10 @@ const Header = ({ toggleChatVisibility, isChatVisible, users, userID, selectUser
                 </label>
             </div>
             <h2>Messenger</h2>
-            <label style={{ marginLeft: 'auto', marginRight: 16, fontSize: 14 }}>
-                <span>Демо · Пользователь</span>
-                <select aria-label="Пользователь" value={userID ?? ''} onChange={event => selectUser(Number(event.target.value))}>
-                    {users.map(user => <option key={user.id} value={user.id}>{user.first_name || user.username}</option>)}
-                </select>
-            </label>
+            <div className="account">
+                <span aria-label="Текущий пользователь">{user.first_name || user.username}</span>
+                <button onClick={logout} disabled={signingOut}>{signingOut ? 'Выход…' : 'Выйти'}</button>
+            </div>
         </StyledHeader>
     );
 }
@@ -40,10 +38,10 @@ const StyledHeader = styled.header`
     z-index: 100;
 
     h2 { margin: 0; font-size: 22px; }
-    label select { max-width: 160px; min-width: 0; }
+    .account { margin-left: auto; margin-right: 12px; display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; }
+    .account span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     @media (max-width: 600px) {
-        label span { display: none; }
-        label select { max-width: 140px; }
+        .account span { max-width: 80px; }
         h2 { font-size: 18px; }
     }
 

@@ -33,7 +33,7 @@ const ChatContainer = ({ isChatVisible, setChatID, chatID, userID, users }) => {
         setPending(true);
         try {
             const { chat } = await api('/chat', {
-                method: 'POST', body: JSON.stringify({ name: name.trim(), type: 'group', created_by: userID,
+                method: 'POST', body: JSON.stringify({ name: name.trim(), type: 'group',
                     participant_ids: memberID ? [Number(memberID)] : [] }),
             });
             setChats(current => [...current.filter(item => item.id !== chat.id), chat]);

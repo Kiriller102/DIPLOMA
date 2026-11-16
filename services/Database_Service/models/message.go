@@ -14,6 +14,8 @@ type Message struct {
 	ChatID              int                     `json:"chat_id" db:"chat_id"`
 	SenderID            int                     `json:"sender_id" db:"sender_id"`
 	Content             string                  `json:"content" db:"content"`
+	CryptoVersion       int                     `json:"crypto_version" db:"crypto_version"`
+	ClientID            string                  `json:"-" db:"client_id"`
 	EncryptionAlgorithm EncryptionAlgorithmType `json:"encryption_algorithm" db:"encryption_algorithm"`
 	SentAt              time.Time               `json:"sent_at" db:"sent_at"`
 }

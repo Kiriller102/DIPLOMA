@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/services"
 )
 
@@ -15,6 +16,11 @@ func respondError(c *gin.Context, err error) {
 	code, message := http.StatusInternalServerError, "internal server error"
 	var pg *pq.Error
 	switch {
+	case errors.Is(err, auth.ErrUnauthenticated):
+		code, message = http.StatusUnauthorized, "authentication required"
+		c.Header("WWW-Authenticate", "Bearer")
+	case errors.Is(err, auth.ErrForbidden):
+		code, message = http.StatusForbidden, "permission denied"
 	case errors.Is(err, sql.ErrNoRows):
 		code, message = http.StatusNotFound, "not found"
 	case errors.Is(err, services.ErrInvalidInput):

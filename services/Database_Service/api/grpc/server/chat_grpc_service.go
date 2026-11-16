@@ -8,17 +8,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	chatpb "project/services/Database_Service/api/grpc/pb/chat"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
 
 type ChatGRPCService struct {
+	access *auth.Service
 	chatpb.UnimplementedChatServiceServer
 	chatService *services.ChatService
 }
 
-func NewChatGRPCService(chatService *services.ChatService) *ChatGRPCService {
-	return &ChatGRPCService{chatService: chatService}
+func NewChatGRPCService(chatService *services.ChatService, access *auth.Service) *ChatGRPCService {
+	return &ChatGRPCService{chatService: chatService, access: access}
 }
 
 func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChatRequest) (*chatpb.CreateChatResponse, error) {
@@ -35,7 +37,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 
 	chat := models.Chat{
 		Name:      req.Chat.Name,
-		CreatedBy: int(req.Chat.CreatedBy),
+		CreatedBy: s.access.EffectiveUserID(ctx, int(req.Chat.CreatedBy)),
 	}
 
 	if chat.Name == "" {
@@ -98,6 +100,9 @@ func (s *ChatGRPCService) GetChat(ctx context.Context, req *chatpb.GetChatReques
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
+	if err := s.access.RequireChat(ctx, int(req.Id), false); err != nil {
+		return nil, err
+	}
 	chat, err := s.chatService.GetChatByID(int(req.Id))
 	if err != nil {
 		log.Printf("error: get chat by id error: %v", err)
@@ -159,6 +164,9 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 		ID:   int(req.Chat.Id),
 		Name: req.Chat.Name,
 	}
+	if err := s.access.RequireChat(ctx, chat.ID, true); err != nil {
+		return nil, err
+	}
 	err := s.chatService.UpdateChat(chat)
 	if err != nil {
 		log.Printf("error: update chat error: %v", err)
@@ -184,6 +192,9 @@ func (s *ChatGRPCService) DeleteChat(ctx context.Context, req *chatpb.DeleteChat
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
+	if err := s.access.RequireChat(ctx, int(req.Id), true); err != nil {
+		return nil, err
+	}
 	err := s.chatService.DeleteChatByID(int(req.Id))
 	if err != nil {
 		log.Printf("error: delete chat by id error: %v", err)

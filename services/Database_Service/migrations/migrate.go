@@ -51,7 +51,7 @@ func Apply(ctx context.Context, db *sqlx.DB) error {
 	return tx.Commit()
 }
 
-// SeedDemo is explicitly enabled by DEMO_MODE for local demonstrations.
+// SeedDemo preserves the legacy fixtures used by integration tests. The server does not seed passwordless accounts.
 func SeedDemo(ctx context.Context, db *sqlx.DB) error {
 	body, err := files.ReadFile("demo.sql")
 	if err != nil {

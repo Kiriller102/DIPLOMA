@@ -3,7 +3,6 @@ package services
 import (
 	"database/sql"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"log"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/repository"
@@ -11,10 +10,12 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type UserService struct {
-	userRepo repository.UserRepository
+	userRepo repository.UserRepositoryInterface
 	db       *sqlx.DB
 }
 
@@ -29,7 +30,7 @@ func NewUserService(db *sqlx.DB) (*UserService, error) {
 	}
 
 	return &UserService{
-		userRepo: repository.UserRepository{},
+		userRepo: &repository.UserRepository{},
 		db:       db,
 	}, nil
 }

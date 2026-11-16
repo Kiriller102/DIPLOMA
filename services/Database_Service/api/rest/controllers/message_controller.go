@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 	"strconv"
@@ -10,11 +11,12 @@ import (
 )
 
 type MessageController struct {
+	access         *auth.Service
 	messageService *services.MessageService
 }
 
-func NewMessageController(messageService *services.MessageService) *MessageController {
-	return &MessageController{messageService: messageService}
+func NewMessageController(messageService *services.MessageService, access *auth.Service) *MessageController {
+	return &MessageController{messageService: messageService, access: access}
 }
 
 func (mc *MessageController) CreateMessage(c *gin.Context) {
@@ -29,6 +31,11 @@ func (mc *MessageController) CreateMessage(c *gin.Context) {
 		return
 	}
 
+	message.SenderID = mc.access.EffectiveUserID(c.Request.Context(), message.SenderID)
+	if err := mc.access.RequireChat(c.Request.Context(), message.ChatID, false); err != nil {
+		respondError(c, err)
+		return
+	}
 	err := mc.messageService.CreateMessage(&message)
 	if err != nil {
 		respondError(c, err)
@@ -54,6 +61,10 @@ func (mc *MessageController) LongPolling(c *gin.Context) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
+		if err := mc.access.RequireChat(c.Request.Context(), chatID, false); err != nil {
+			respondError(c, err)
+			return
+		}
 		messages, err := mc.messageService.GetMessagesAfter(c.Request.Context(), chatID, lastID)
 		if err != nil {
 			if c.Request.Context().Err() == nil {
@@ -88,6 +99,10 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		return
 	}
 
+	if err := mc.access.RequireChat(c.Request.Context(), chatID, false); err != nil {
+		respondError(c, err)
+		return
+	}
 	messages, err := mc.messageService.GetMessagesByChatID(chatID)
 
 	if err != nil {
@@ -121,6 +136,10 @@ func (mc *MessageController) UpdateMessage(c *gin.Context) {
 	}
 	message.ID = id
 
+	if err := mc.access.RequireMessage(c.Request.Context(), id, true); err != nil {
+		respondError(c, err)
+		return
+	}
 	err = mc.messageService.UpdateMessage(message)
 	if err != nil {
 		respondError(c, err)
@@ -128,6 +147,37 @@ func (mc *MessageController) UpdateMessage(c *gin.Context) {
 	}
 
 	message, err = mc.messageService.GetMessageByID(id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": message})
+}
+
+func (mc *MessageController) EncryptLegacyMessage(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "positive message id required"})
+		return
+	}
+	if err = mc.access.RequireMessage(c.Request.Context(), id, false); err != nil {
+		respondError(c, err)
+		return
+	}
+	var input struct {
+		Content      string `json:"content"`
+		PreviousHash string `json:"previous_hash"`
+	}
+	if err = c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid encrypted message"})
+		return
+	}
+	p, err := auth.Current(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	message, err := mc.messageService.EncryptLegacyMessage(c.Request.Context(), id, p.User.ID, input.Content, input.PreviousHash)
 	if err != nil {
 		respondError(c, err)
 		return

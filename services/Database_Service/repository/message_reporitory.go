@@ -11,20 +11,20 @@ import (
 )
 
 type MessageRepositoryInterface interface {
-	CreateMessage(db *sqlx.DB, message *models.Message) error
-	GetMessageByID(db *sqlx.DB, id int) (models.Message, error)
+	CreateMessage(db sqlx.Ext, message *models.Message) error
+	GetMessageByID(db sqlx.Queryer, id int) (models.Message, error)
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
 	GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error)
-	UpdateMessage(db *sqlx.DB, message models.Message) error
+	UpdateMessage(db sqlx.Ext, message models.Message) error
 	DeleteMessageByID(db *sqlx.DB, id int) error
 }
 
 type MessageRepository struct{}
 
-func (r *MessageRepository) CreateMessage(db *sqlx.DB, message *models.Message) error {
+func (r *MessageRepository) CreateMessage(db sqlx.Ext, message *models.Message) error {
 	query := `
-		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at) VALUES ($1, $2, $3, NULLIF($4, '')::encryption_algorithm_type, $5) RETURNING id
+		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at, crypto_version, client_id) VALUES ($1, $2, $3, $4::encryption_algorithm_type, $5, $6, $7) RETURNING id
 	`
 
 	err := db.QueryRowx(
@@ -34,6 +34,8 @@ func (r *MessageRepository) CreateMessage(db *sqlx.DB, message *models.Message) 
 		message.Content,
 		message.EncryptionAlgorithm,
 		message.SentAt,
+		message.CryptoVersion,
+		message.ClientID,
 	).Scan(&message.ID)
 
 	if err != nil {
@@ -44,7 +46,7 @@ func (r *MessageRepository) CreateMessage(db *sqlx.DB, message *models.Message) 
 	return nil
 }
 
-func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message, error) {
+func (r *MessageRepository) GetMessageByID(db sqlx.Queryer, id int) (models.Message, error) {
 	var message models.Message
 
 	if id == 0 {
@@ -52,10 +54,10 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 	}
 
 	query := `
-		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at  FROM messages WHERE id = $1
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id FROM messages WHERE id = $1
 	`
 
-	err := db.Get(&message, query, id)
+	err := sqlx.Get(db, &message, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -72,7 +74,7 @@ func (r *MessageRepository) GetMessageByID(db *sqlx.DB, id int) (models.Message,
 func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error) {
 	messages := make([]models.Message, 0)
 	query := `
-		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at FROM messages
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id FROM messages
 	`
 
 	rows, err := db.Query(query)
@@ -90,7 +92,7 @@ func (r *MessageRepository) GetAllMessages(db *sqlx.DB) ([]models.Message, error
 			&message.SenderID,
 			&message.Content,
 			&message.EncryptionAlgorithm,
-			&message.SentAt)
+			&message.SentAt, &message.CryptoVersion, &message.ClientID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return messages, rows.Err()
@@ -108,7 +110,7 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 	messages := make([]models.Message, 0)
 
 	query := `
-		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at FROM messages WHERE sender_id = $1
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id FROM messages WHERE sender_id = $1
 	`
 	rows, err := db.Query(query, senderId)
 	if err != nil {
@@ -126,7 +128,7 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 			&message.SenderID,
 			&message.Content,
 			&message.EncryptionAlgorithm,
-			&message.SentAt)
+			&message.SentAt, &message.CryptoVersion, &message.ClientID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return messages, rows.Err()
@@ -144,7 +146,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 	messages := make([]models.Message, 0)
 
 	query := `
-		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id
 		FROM messages
 		WHERE chat_id = $1
 		ORDER BY id
@@ -165,7 +167,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 			&message.SenderID,
 			&message.Content,
 			&message.EncryptionAlgorithm,
-			&message.SentAt)
+			&message.SentAt, &message.CryptoVersion, &message.ClientID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return messages, rows.Err()
@@ -179,16 +181,16 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 	return messages, rows.Err()
 }
 
-func (r *MessageRepository) UpdateMessage(db *sqlx.DB, message models.Message) error {
+func (r *MessageRepository) UpdateMessage(db sqlx.Ext, message models.Message) error {
 	query := `
 		UPDATE messages
 		SET
-		    content = $1
+		    content = $1, encryption_algorithm = $3::encryption_algorithm_type, crypto_version = $4, client_id = $5
 		WHERE
 		    id = $2
 	`
 
-	_, err := db.Exec(query, message.Content, message.ID)
+	_, err := db.Exec(query, message.Content, message.ID, message.EncryptionAlgorithm, message.CryptoVersion, message.ClientID)
 
 	if err != nil {
 		log.Printf("rrror while updating message (ID: %d) into database: %v", message.ID, err)
@@ -227,7 +229,7 @@ func (r *MessageRepository) DeleteMessageByID(db *sqlx.DB, id int) error {
 func (r *MessageRepository) GetMessagesAfter(ctx context.Context, db *sqlx.DB, chatID, lastID int) ([]models.Message, error) {
 	messages := make([]models.Message, 0)
 	err := db.SelectContext(ctx, &messages, `SELECT id, chat_id, sender_id, content,
-        COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at
+        COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id
         FROM messages WHERE chat_id = $1 AND id > $2 ORDER BY id LIMIT 100`, chatID, lastID)
 	return messages, err
 }

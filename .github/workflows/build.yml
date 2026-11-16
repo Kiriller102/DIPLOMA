@@ -46,6 +46,7 @@ jobs:
           cache: npm
           cache-dependency-path: services/messenger_web/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run lint
       - run: npm run build
 

@@ -8,17 +8,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	chatpartpb "project/services/Database_Service/api/grpc/pb/chat_participant"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
 
 type ChatParticipantGRPCService struct {
+	access *auth.Service
 	chatpartpb.UnimplementedChatParticipantServiceServer
 	chatPartService *services.ChatParticipantService
 }
 
-func NewChatParticipantGRPCService(chatPartService *services.ChatParticipantService) *ChatParticipantGRPCService {
-	return &ChatParticipantGRPCService{chatPartService: chatPartService}
+func NewChatParticipantGRPCService(chatPartService *services.ChatParticipantService, access *auth.Service) *ChatParticipantGRPCService {
+	return &ChatParticipantGRPCService{chatPartService: chatPartService, access: access}
 }
 
 func (s *ChatParticipantGRPCService) CreateChatParticipant(ctx context.Context, req *chatpartpb.CreateChatParticipantRequest) (*chatpartpb.CreateChatParticipantResponse, error) {
@@ -50,6 +52,9 @@ func (s *ChatParticipantGRPCService) CreateChatParticipant(ctx context.Context, 
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat participant role is required")
 	}
 
+	if err := s.access.RequireChat(ctx, chatParticipant.ChatID, true); err != nil {
+		return nil, err
+	}
 	err := s.chatPartService.CreateChatParticipant(&chatParticipant)
 	if err != nil {
 		return &chatpartpb.CreateChatParticipantResponse{
@@ -79,6 +84,9 @@ func (s *ChatParticipantGRPCService) DeleteChatParticipant(ctx context.Context, 
 		UserID: int(req.ChatParticipant.UserId),
 	}
 
+	if err := s.access.RequireRemoveParticipant(ctx, cp.ChatID, cp.UserID); err != nil {
+		return nil, err
+	}
 	err := s.chatPartService.DeleteParticipantByUserID(cp)
 	if err != nil {
 		return &chatpartpb.DeleteChatParticipantResponse{
@@ -92,7 +100,12 @@ func (s *ChatParticipantGRPCService) DeleteChatParticipant(ctx context.Context, 
 	return &chatpartpb.DeleteChatParticipantResponse{}, nil
 }
 
+// Bulk removal would remove the chat owner as well. Delete the chat instead.
 func (s *ChatParticipantGRPCService) DeleteAllChatParticipants(ctx context.Context, req *chatpartpb.DeleteAllChatParticipantsRequest) (*chatpartpb.DeleteAllChatParticipantsResponse, error) {
+	return nil, auth.ErrForbidden
+}
+
+func (s *ChatParticipantGRPCService) deleteAllChatParticipantsLegacy(ctx context.Context, req *chatpartpb.DeleteAllChatParticipantsRequest) (*chatpartpb.DeleteAllChatParticipantsResponse, error) {
 	if req == nil || req.ChatId == 0 {
 		log.Println("error: DeleteAllChatParticipantRequest is nil")
 		return &chatpartpb.DeleteAllChatParticipantsResponse{
@@ -130,6 +143,9 @@ func (s *ChatParticipantGRPCService) GetChatParticipants(ctx context.Context, re
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
+	if err := s.access.RequireChat(ctx, int(req.ChatId), false); err != nil {
+		return nil, err
+	}
 	chatParticipants, err := s.chatPartService.GetAllChatParticipants(int(req.ChatId))
 	if err != nil {
 		log.Printf("error: GetChatParticipants is invalid: %v", err.Error())

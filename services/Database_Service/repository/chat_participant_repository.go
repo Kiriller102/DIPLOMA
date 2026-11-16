@@ -18,16 +18,24 @@ type ChatParticipantRepositoryInterface interface {
 type ChatParticipantRepository struct{}
 
 func (r *ChatParticipantRepository) CreateParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = LockChat(tx, participant.ChatID); err != nil {
+		return err
+	}
 	query := `
 		INSERT INTO chat_participants (chat_id, user_id, role, joined_at)
 		VALUES ($1, $2, $3, $4)
 	`
-	_, err := db.Exec(query, participant.ChatID, participant.UserID, participant.UserRole, participant.JoinedAt)
+	_, err = tx.Exec(query, participant.ChatID, participant.UserID, participant.UserRole, participant.JoinedAt)
 	if err != nil {
 		log.Printf("error inserting participant: %v", err.Error())
 		return err
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error) {
@@ -59,12 +67,20 @@ func (r *ChatParticipantRepository) GetAllChatsByUserID(db *sqlx.DB, userID int)
 }
 
 func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = LockChat(tx, chatID); err != nil {
+		return err
+	}
 	query := `
 		DELETE FROM chat_participants 
 		WHERE chat_id = $1
 	`
 
-	result, err := db.Exec(query, chatID)
+	result, err := tx.Exec(query, chatID)
 	if err != nil {
 		log.Printf("error deleting participants: %v", err.Error())
 		return err
@@ -81,15 +97,23 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, c
 		return fmt.Errorf("no participants found for chatID: %d", chatID)
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (r *ChatParticipantRepository) DeleteParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = LockChat(tx, participant.ChatID); err != nil {
+		return err
+	}
 	query := `
 		DELETE FROM chat_participants
 		WHERE user_id = $1 AND chat_id = $2
 	`
-	result, err := db.Exec(query, participant.UserID, participant.ChatID)
+	result, err := tx.Exec(query, participant.UserID, participant.ChatID)
 	if err != nil {
 		log.Printf("error deleting participants: %v", err.Error())
 		return err
@@ -110,5 +134,5 @@ func (r *ChatParticipantRepository) DeleteParticipant(db *sqlx.DB, participant m
 		return fmt.Errorf("participants found for chatID: %d (user_id: %d", participant.ChatID, participant.UserID)
 	}
 
-	return nil
+	return tx.Commit()
 }

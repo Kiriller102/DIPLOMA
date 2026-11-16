@@ -8,17 +8,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	messagepb "project/services/Database_Service/api/grpc/pb/message"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
 
 type MessageGRPCService struct {
+	access *auth.Service
 	messagepb.UnimplementedMessageServiceServer
 	messageService *services.MessageService
 }
 
-func NewMessageGRPCService(messageService *services.MessageService) *MessageGRPCService {
-	return &MessageGRPCService{messageService: messageService}
+func NewMessageGRPCService(messageService *services.MessageService, access *auth.Service) *MessageGRPCService {
+	return &MessageGRPCService{messageService: messageService, access: access}
 }
 
 func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.CreateMessageRequest) (*messagepb.CreateMessageResponse, error) {
@@ -54,6 +56,10 @@ func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.C
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: EncryptionAlgorithmType is required")
 	}
 
+	message.SenderID = s.access.EffectiveUserID(ctx, message.SenderID)
+	if err := s.access.RequireChat(ctx, message.ChatID, false); err != nil {
+		return nil, err
+	}
 	err := s.messageService.CreateMessage(&message)
 	if err != nil {
 		log.Println("grpc error creating message: ", err)
@@ -81,6 +87,9 @@ func (s *MessageGRPCService) GetMessage(ctx context.Context, req *messagepb.GetM
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
+	if err := s.access.RequireMessage(ctx, int(req.Id), false); err != nil {
+		return nil, err
+	}
 	message, err := s.messageService.GetMessageByID(int(req.Id))
 	if err != nil {
 		log.Println("grpc error getting message: ", err)
@@ -149,6 +158,9 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: EncryptionAlgorithmType is required")
 	}
 
+	if err := s.access.RequireMessage(ctx, message.ID, true); err != nil {
+		return nil, err
+	}
 	err := s.messageService.UpdateMessage(message)
 	if err != nil {
 		log.Println("grpc error updating message: ", err)
@@ -176,6 +188,9 @@ func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messa
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: chat_id is required")
 	}
 
+	if err := s.access.RequireChat(ctx, int(req.ChatId), false); err != nil {
+		return nil, err
+	}
 	messages, err := s.messageService.GetMessagesByChatID(int(req.ChatId))
 	if err != nil {
 		log.Println("grpc error getting message: ", err)

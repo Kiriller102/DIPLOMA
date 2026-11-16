@@ -16,6 +16,7 @@ import (
 	"project/services/Database_Service/api/grpc"
 	"project/services/Database_Service/api/rest"
 	"project/services/Database_Service/api/rest/controllers"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/migrations"
 	"project/services/Database_Service/repository"
 	"project/services/Database_Service/services"
@@ -49,12 +50,11 @@ func run() error {
 	if err := migrations.Apply(initCtx, db); err != nil {
 		return err
 	}
-	if env("DEMO_MODE", "false") == "true" {
-		log.Println("Demo mode: user selection does not authenticate requests")
-		if err := migrations.SeedDemo(initCtx, db); err != nil {
-			return err
-		}
+	access, err := auth.New(db)
+	if err != nil {
+		return err
 	}
+
 	users, err := services.NewUserService(db)
 	if err != nil {
 		return err
@@ -71,10 +71,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	httpServer := rest.NewHTTPServer(controllers.NewUserController(users), controllers.NewMessageController(messages),
-		controllers.NewChatController(chats), controllers.NewChatParticipantController(participants), db)
-	grpcServer := grpc.NewGRPCServer()
-	grpcServer.RegisterServices(users, messages, chats, participants)
+	httpServer := rest.NewHTTPServer(controllers.NewUserController(users, access), controllers.NewMessageController(messages, access),
+		controllers.NewChatController(chats, access), controllers.NewChatParticipantController(participants, access), db, access, env("COOKIE_SECURE", "false") == "true")
+	grpcServer := grpc.NewGRPCServer(access)
+	grpcServer.RegisterServices(users, messages, chats, participants, access)
 	httpListener, err := net.Listen("tcp", ":"+env("HTTP_PORT", "8080"))
 	if err != nil {
 		return err

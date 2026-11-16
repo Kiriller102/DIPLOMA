@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { api } from '../api';
+import { ALGORITHMS } from '../crypto/protocol';
 
-const Input = ({ chatID, userID }) => {
+const Input = ({ chatID, userID, cryptoSession, algorithm, setAlgorithm }) => {
     const [message, setMessage] = useState('');
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
@@ -13,13 +14,14 @@ const Input = ({ chatID, userID }) => {
         if (!message.trim() || !chatID || !userID || pending) return;
         setPending(true);
         try {
+            const content = await cryptoSession.encrypt(message, chatID, algorithm);
             await api('/messages', {
                 method: 'POST',
-                body: JSON.stringify({ content: message, sender_id: userID, chat_id: chatID }),
+                body: JSON.stringify({ content, chat_id: chatID }),
             });
             setMessage('');
             setError('');
-            textareaRef.current.style.height = 'auto';
+            if (textareaRef.current) textareaRef.current.style.height = 'auto';
         } catch (err) { setError(`Не удалось отправить сообщение: ${err.message}`); }
         finally { setPending(false); }
     };
@@ -39,6 +41,11 @@ const Input = ({ chatID, userID }) => {
 
     return (
         <StyledWrapper>
+            <label className="encryption">Сквозное шифрование
+                <select aria-label="Алгоритм шифрования" value={algorithm} onChange={event => setAlgorithm(event.target.value)} disabled={pending}>
+                    {Object.entries(ALGORITHMS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+            </label>
             <div className="input-container">
                 {error && <span role="alert">{error}</span>}
                 <textarea
@@ -66,10 +73,13 @@ const Input = ({ chatID, userID }) => {
 
 const StyledWrapper = styled.div`
     display: flex;
+    flex-direction: column;
     justify-content: flex-end;
     width: 100%;
     margin-right: 10px;
     margin-bottom: 10px;
+    .encryption { display: flex; align-items: center; gap: 8px; padding: 8px; flex-wrap: wrap; color: #c5c8e0; font-size: 13px; }
+    select { max-width: 100%; padding: 6px; border-radius: 6px; background: #292a36; color: white; }
 
     .input-container {
         display: flex;

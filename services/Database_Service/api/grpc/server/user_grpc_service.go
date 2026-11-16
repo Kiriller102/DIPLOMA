@@ -9,20 +9,27 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log"
 	userpb "project/services/Database_Service/api/grpc/pb/user"
+	"project/services/Database_Service/auth"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
 
 type UserGRPCService struct {
+	access *auth.Service
 	userpb.UnimplementedUserServiceServer
 	userService *services.UserService
 }
 
-func NewUserGRPCsService(userService *services.UserService) *UserGRPCService {
-	return &UserGRPCService{userService: userService}
+func NewUserGRPCsService(userService *services.UserService, access *auth.Service) *UserGRPCService {
+	return &UserGRPCService{userService: userService, access: access}
 }
 
+// Registration accepts a plaintext password only through the dedicated HTTP endpoint.
 func (s *UserGRPCService) CreateUser(ctx context.Context, req *userpb.CreateUserRequest) (*userpb.CreateUserResponse, error) {
+	return nil, auth.ErrForbidden
+}
+
+func (s *UserGRPCService) createUserLegacy(ctx context.Context, req *userpb.CreateUserRequest) (*userpb.CreateUserResponse, error) {
 
 	if req == nil || req.User == nil {
 		log.Println("grpc error creating user: CreateUserRequest is nil")
@@ -104,6 +111,9 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 		}, err
 	}
 
+	if err := s.access.RequireSelf(ctx, user.ID); err != nil {
+		return nil, err
+	}
 	return &userpb.GetUserResponse{
 		Result: &userpb.GetUserResponse_User{
 			User: &userpb.User{
@@ -136,6 +146,7 @@ func (s *UserGRPCService) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*u
 
 	var grpcUsers []*userpb.User
 	for _, user := range users {
+		user.Email = ""
 		grpcUsers = append(grpcUsers, &userpb.User{
 			Id:        int64(user.ID),
 			Username:  user.Username,
@@ -178,6 +189,12 @@ func (s *UserGRPCService) UpdateUser(ctx context.Context, req *userpb.UpdateUser
 		IsActive:     req.User.IsActive,
 	}
 
+	if err := s.access.RequireSelf(ctx, user.ID); err != nil {
+		return nil, err
+	}
+	if user.PasswordHash != "" || user.Email != "" {
+		return nil, grpcstatus.Error(codes.InvalidArgument, "email and password cannot be changed via profile")
+	}
 	err := s.userService.UpdateUser(user)
 	if err != nil {
 		log.Printf("grpc error updating user: %v", err)
@@ -204,6 +221,9 @@ func (s *UserGRPCService) DeleteUser(ctx context.Context, req *userpb.DeleteUser
 		}, grpcstatus.Error(codes.InvalidArgument, "invalid request: id is required")
 	}
 
+	if err := s.access.RequireSelf(ctx, int(req.Id)); err != nil {
+		return nil, err
+	}
 	err := s.userService.DeleteUser(int(req.Id))
 	if err != nil {
 		log.Printf("grpc error deleting user: %v", err)

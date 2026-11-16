@@ -1,5 +1,7 @@
 .PHONY: up down logs test vet integration crypto-test proto e2e
 
+E2E_NETWORK ?= diploma_default
+
 up:
 	docker compose up -d --build --wait
 
@@ -28,4 +30,4 @@ proto:
 	sh scripts/generate-proto.sh
 
 e2e:
-	docker run --rm --init --shm-size=256m --network diploma_default -e WEB_URL=http://web -v "$(CURDIR)/scripts:/work:ro" -w /tmp mcr.microsoft.com/playwright:v1.64.0-noble sh -ec 'npm install --prefix /tmp/browser playwright@1.64.0 --no-audit --no-fund >/dev/null; NODE_PATH=/tmp/browser/node_modules node /work/browser-smoke.cjs'
+	docker run --rm --init --shm-size=256m --network $(E2E_NETWORK) -e WEB_URL=http://web -v "$(CURDIR)/scripts:/work:ro" -w /tmp mcr.microsoft.com/playwright:v1.64.0-noble sh -ec 'npm install --prefix /tmp/browser playwright@1.64.0 --no-audit --no-fund >/dev/null; NODE_PATH=/tmp/browser/node_modules node /work/browser-smoke.cjs'

@@ -8,7 +8,6 @@ import (
 	"log"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/repository"
-	"strings"
 	"time"
 )
 
@@ -43,33 +42,26 @@ func (s *MessageService) CreateMessage(message *models.Message) error {
 		return fmt.Errorf("%w: sender id is required", ErrInvalidInput)
 	}
 
-	if strings.TrimSpace(message.Content) == "" || len(message.Content) > 65536 {
-		log.Printf("error: message.Content is nil (message.id: %d)", message.ID)
-		return fmt.Errorf("%w: message content is required", ErrInvalidInput)
-	}
-
-	if len(message.Content) > 65536 {
-		return fmt.Errorf("%w: message exceeds 65536 bytes", ErrInvalidInput)
-	}
-	if message.EncryptionAlgorithm != "" && message.EncryptionAlgorithm != models.EncryptionAlgorithmAES && message.EncryptionAlgorithm != models.EncryptionAlgorithmKuznechik {
-		return fmt.Errorf("%w: unknown encryption_algorithm", ErrInvalidInput)
-	}
-	var member bool
-	if err := s.db.Get(&member, `SELECT EXISTS (SELECT 1 FROM chat_participants WHERE chat_id = $1 AND user_id = $2)`, message.ChatID, message.SenderID); err != nil {
+	tx, err := s.db.Beginx()
+	if err != nil {
 		return err
 	}
-	if !member {
-		return fmt.Errorf("%w: sender must be a chat participant", ErrInvalidInput)
+	defer tx.Rollback()
+	if err = repository.LockChat(tx, message.ChatID); err != nil {
+		return err
+	}
+	if err := s.validateEncryption(tx, message, message.SenderID, 0); err != nil {
+		return err
 	}
 	message.SentAt = time.Now().UTC()
 
-	err := s.messageRepo.CreateMessage(s.db, message)
+	err = s.messageRepo.CreateMessage(tx, message)
 	if err != nil {
 		log.Printf("error: messageRepo.CreateMessage error: %v", err)
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (s *MessageService) GetMessagesByChatID(ChatID int) ([]models.Message, error) {
@@ -108,22 +100,31 @@ func (s *MessageService) UpdateMessage(message models.Message) error {
 		log.Printf("error: no message found with id: %d", message.ID)
 		return errors.New("no message found with id")
 	}
-
-	if strings.TrimSpace(message.Content) == "" || len(message.Content) > 65536 {
-		log.Printf("error: message.Content is nil (message.id: %d)", message.ID)
-		return fmt.Errorf("%w: message content is required", ErrInvalidInput)
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = repository.LockChat(tx, msg.ChatID); err != nil {
+		return err
+	}
+	msg, err = s.messageRepo.GetMessageByID(tx, message.ID)
+	if err != nil {
+		return err
 	}
 
 	msg.Content = message.Content
-	msg.EncryptionAlgorithm = message.EncryptionAlgorithm
+	if err := s.validateEncryption(tx, &msg, msg.SenderID, 0); err != nil {
+		return err
+	}
 
-	err = s.messageRepo.UpdateMessage(s.db, msg)
+	err = s.messageRepo.UpdateMessage(tx, msg)
 	if err != nil {
 		log.Printf("error: messageRepo.UpdateMessage error: %v", err)
 		return err
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (s *MessageService) GetMessagesAfter(ctx context.Context, chatID, lastID int) ([]models.Message, error) {
