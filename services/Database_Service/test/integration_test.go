@@ -9,13 +9,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/grpc"
@@ -32,59 +29,9 @@ import (
 	"project/services/Database_Service/api/rest"
 	"project/services/Database_Service/api/rest/controllers"
 	"project/services/Database_Service/auth"
-	"project/services/Database_Service/migrations"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
-
-func testDB(t *testing.T) *sqlx.DB {
-	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("set TEST_DATABASE_URL to run PostgreSQL integration tests")
-	}
-	admin, err := sqlx.Connect("postgres", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	schema := fmt.Sprintf("test_messenger_%d", time.Now().UnixNano())
-	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
-		admin.Close()
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if _, err := admin.Exec("DROP SCHEMA " + schema + " CASCADE"); err != nil {
-			t.Error(err)
-		}
-		admin.Close()
-	})
-	u, err := url.Parse(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	q := u.Query()
-	q.Set("search_path", schema)
-	u.RawQuery = q.Encode()
-	db, err := sqlx.Connect("postgres", u.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	db.SetMaxOpenConns(4)
-	for i := 0; i < 2; i++ {
-		if err := migrations.Apply(context.Background(), db); err != nil {
-			t.Fatal(err)
-		}
-		if err := migrations.SeedDemo(context.Background(), db); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var count int
-	if err := db.Get(&count, "SELECT COUNT(*) FROM chat_participants"); err != nil || count != 2 {
-		t.Fatalf("idempotent seeding: participants=%d, err=%v", count, err)
-	}
-	return db
-}
 
 func TestMessengerIntegration(t *testing.T) {
 	db := testDB(t)

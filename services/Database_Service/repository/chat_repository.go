@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,26 +11,26 @@ import (
 )
 
 type ChatRepositoryInterface interface {
-	CreateChat(db *sqlx.DB, chat *models.Chat) error
-	GetChatByID(db *sqlx.DB, id int) (models.Chat, error)
-	UpdateChat(db *sqlx.DB, chat models.Chat) error
-	DeleteChatByID(db *sqlx.DB, id int) error
+	CreateChat(ctx context.Context, db *sqlx.DB, chat *models.Chat) error
+	GetChatByID(ctx context.Context, db *sqlx.DB, id int) (models.Chat, error)
+	UpdateChat(ctx context.Context, db *sqlx.DB, chat models.Chat) error
+	DeleteChatByID(ctx context.Context, db *sqlx.DB, id int) error
 }
 
 type ChatRepository struct{}
 
-func (r *ChatRepository) CreateChat(db *sqlx.DB, chat *models.Chat) error {
-	tx, err := db.Beginx()
+func (r *ChatRepository) CreateChat(ctx context.Context, db *sqlx.DB, chat *models.Chat) error {
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	err = tx.QueryRowx(`INSERT INTO chats (name, type, created_by, created_at)
+	err = tx.QueryRowxContext(ctx, `INSERT INTO chats (name, type, created_by, created_at)
         VALUES ($1, $2, $3, $4) RETURNING id`, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt).Scan(&chat.ID)
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'admin')`, chat.ID, chat.CreatedBy)
+	_, err = tx.ExecContext(ctx, `INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'admin')`, chat.ID, chat.CreatedBy)
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func (r *ChatRepository) CreateChat(db *sqlx.DB, chat *models.Chat) error {
 		if userID <= 0 {
 			return fmt.Errorf("invalid participant id")
 		}
-		_, err = tx.Exec(`INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`, chat.ID, userID)
+		_, err = tx.ExecContext(ctx, `INSERT INTO chat_participants (chat_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`, chat.ID, userID)
 		if err != nil {
 			return err
 		}
@@ -45,13 +46,13 @@ func (r *ChatRepository) CreateChat(db *sqlx.DB, chat *models.Chat) error {
 	return tx.Commit()
 }
 
-func (r *ChatRepository) GetChatByID(db *sqlx.DB, id int) (models.Chat, error) {
+func (r *ChatRepository) GetChatByID(ctx context.Context, db *sqlx.DB, id int) (models.Chat, error) {
 	query := `
 		SELECT id, name, type, created_by, created_at FROM chats WHERE id = $1 
 	`
 
 	var chat models.Chat
-	err := db.Get(&chat, query, id)
+	err := db.GetContext(ctx, &chat, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -65,7 +66,7 @@ func (r *ChatRepository) GetChatByID(db *sqlx.DB, id int) (models.Chat, error) {
 	return chat, nil
 }
 
-func (r *ChatRepository) UpdateChat(db *sqlx.DB, chat models.Chat) error {
+func (r *ChatRepository) UpdateChat(ctx context.Context, db *sqlx.DB, chat models.Chat) error {
 	query := `
 		UPDATE chats
 		SET 
@@ -77,7 +78,7 @@ func (r *ChatRepository) UpdateChat(db *sqlx.DB, chat models.Chat) error {
 		    id = $5
 	`
 
-	_, err := db.Exec(query, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt, chat.ID)
+	_, err := db.ExecContext(ctx, query, chat.Name, chat.Type, chat.CreatedBy, chat.CreatedAt, chat.ID)
 	if err != nil {
 		log.Printf("error updating chat (id: %d): %v", chat.ID, err)
 		return err
@@ -86,12 +87,12 @@ func (r *ChatRepository) UpdateChat(db *sqlx.DB, chat models.Chat) error {
 	return nil
 }
 
-func (r *ChatRepository) DeleteChatByID(db *sqlx.DB, id int) error {
+func (r *ChatRepository) DeleteChatByID(ctx context.Context, db *sqlx.DB, id int) error {
 	query := `
 		DELETE FROM chats WHERE id = $1
 	`
 
-	result, err := db.Exec(query, id)
+	result, err := db.ExecContext(ctx, query, id)
 	if err != nil {
 		log.Printf("error deleting chat (id: %d): %v", id, err)
 		return err

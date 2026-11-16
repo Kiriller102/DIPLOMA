@@ -78,6 +78,10 @@ func NewHTTPServer(userController *controllers.UserController,
 				return
 			}
 		}
+		if c.Request.Context().Err() != nil {
+			c.Abort()
+			return
+		}
 		code, message := http.StatusUnauthorized, "authentication required"
 		if errors.Is(err, auth.ErrForbidden) {
 			code, message = http.StatusForbidden, "permission denied"

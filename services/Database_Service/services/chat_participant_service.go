@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
@@ -30,7 +31,7 @@ func NewChatParticipantService(db *sqlx.DB) (*ChatParticipantService, error) {
 	}, nil
 }
 
-func (s *ChatParticipantService) CreateChatParticipant(chPart *models.ChatParticipant) error {
+func (s *ChatParticipantService) CreateChatParticipant(ctx context.Context, chPart *models.ChatParticipant) error {
 	if chPart == nil || chPart.UserID <= 0 {
 		log.Printf("error: ChatParticipant.UserID is zero")
 		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
@@ -46,7 +47,7 @@ func (s *ChatParticipantService) CreateChatParticipant(chPart *models.ChatPartic
 	}
 	chPart.JoinedAt = time.Now().UTC()
 
-	err := s.chatParticipantRepo.CreateParticipant(s.db, *chPart)
+	err := s.chatParticipantRepo.CreateParticipant(ctx, s.db, *chPart)
 	if err != nil {
 		log.Printf("error: chatParticipant.CreateParticipant error: %s", err)
 		return err
@@ -55,13 +56,13 @@ func (s *ChatParticipantService) CreateChatParticipant(chPart *models.ChatPartic
 	return nil
 }
 
-func (s *ChatParticipantService) GetAllChatParticipants(chatID int) ([]models.ChatParticipant, error) {
+func (s *ChatParticipantService) GetAllChatParticipants(ctx context.Context, chatID int) ([]models.ChatParticipant, error) {
 	if chatID <= 0 {
 		log.Printf("error: ChatParticipant.ChatID is zero")
 		return []models.ChatParticipant{}, fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
-	chatParticipants, err := s.chatParticipantRepo.GetAllChatParticipants(s.db, chatID)
+	chatParticipants, err := s.chatParticipantRepo.GetAllChatParticipants(ctx, s.db, chatID)
 	if err != nil {
 		log.Printf("error: GetAllChatParticipants error: %s", err)
 		return []models.ChatParticipant{}, err
@@ -70,13 +71,13 @@ func (s *ChatParticipantService) GetAllChatParticipants(chatID int) ([]models.Ch
 	return chatParticipants, nil
 }
 
-func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]models.Chat, error) {
+func (s *ChatParticipantService) GetChatsIdsByUserID(ctx context.Context, userID int) ([]models.Chat, error) {
 	if userID <= 0 {
 		log.Printf("error: ChatParticipant.UserID is zero")
 		return []models.Chat{}, fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
-	Chats, err := s.chatParticipantRepo.GetAllChatsByUserID(s.db, userID)
+	Chats, err := s.chatParticipantRepo.GetAllChatsByUserID(ctx, s.db, userID)
 
 	if err != nil {
 		log.Printf("error: GetChatsIdsByUserID error: %s", err)
@@ -86,7 +87,7 @@ func (s *ChatParticipantService) GetChatsIdsByUserID(userID int) ([]models.Chat,
 	return Chats, nil
 }
 
-func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.ChatParticipant) error {
+func (s *ChatParticipantService) DeleteParticipantByUserID(ctx context.Context, participant models.ChatParticipant) error {
 	if participant.UserID <= 0 {
 		log.Printf("error: participant.UserID is zero")
 		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
@@ -97,7 +98,7 @@ func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.Ch
 		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
-	if cp, err := s.chatParticipantRepo.GetParticipant(s.db, participant); err != nil {
+	if cp, err := s.chatParticipantRepo.GetParticipant(ctx, s.db, participant); err != nil {
 		log.Printf("error: u.GetParticipantByUserId error: %s", err)
 		return err
 	} else if cp == (models.ChatParticipant{}) {
@@ -105,7 +106,7 @@ func (s *ChatParticipantService) DeleteParticipantByUserID(participant models.Ch
 		return errors.New("chat participant not found")
 	}
 
-	err := s.chatParticipantRepo.DeleteParticipant(s.db, participant)
+	err := s.chatParticipantRepo.DeleteParticipant(ctx, s.db, participant)
 	if err != nil {
 		log.Printf("error: u.GetParticipantByUserId error: %s", err)
 		return err

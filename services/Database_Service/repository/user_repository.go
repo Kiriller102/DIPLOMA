@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/jmoiron/sqlx"
@@ -10,12 +11,12 @@ import (
 
 type UserRepositoryInterface interface {
 	CreateUser(db *sqlx.DB, user *models.User) error
-	GetAllUsers(db *sqlx.DB) ([]models.User, error)
-	GetUserByID(db *sqlx.DB, id int) (models.User, error)
-	GetUserByUsername(db *sqlx.DB, username string) (models.User, error)
-	GetUserByEmail(db *sqlx.DB, email string) (models.User, error)
-	UpdateUser(db *sqlx.DB, user models.User) error
-	DeleteUserByID(db *sqlx.DB, id int) error
+	GetAllUsers(ctx context.Context, db *sqlx.DB) ([]models.User, error)
+	GetUserByID(ctx context.Context, db *sqlx.DB, id int) (models.User, error)
+	GetUserByUsername(ctx context.Context, db *sqlx.DB, username string) (models.User, error)
+	GetUserByEmail(ctx context.Context, db *sqlx.DB, email string) (models.User, error)
+	UpdateUser(ctx context.Context, db *sqlx.DB, user models.User) error
+	DeleteUserByID(ctx context.Context, db *sqlx.DB, id int) error
 }
 
 type UserRepository struct{}
@@ -33,12 +34,12 @@ func (r *UserRepository) CreateUser(db *sqlx.DB, user *models.User) error {
 	return nil
 }
 
-func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
+func (r *UserRepository) GetAllUsers(ctx context.Context, db *sqlx.DB) ([]models.User, error) {
 	users := make([]models.User, 0)
 	query := `
 		SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active FROM users
 	`
-	rows, err := db.Query(query)
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("error getting users: %v", err)
 		return users, err
@@ -70,7 +71,7 @@ func (r *UserRepository) GetAllUsers(db *sqlx.DB) ([]models.User, error) {
 	return users, rows.Err()
 }
 
-func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {
+func (r *UserRepository) GetUserByID(ctx context.Context, db *sqlx.DB, id int) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -78,7 +79,7 @@ func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {
    `
 
 	user := models.User{}
-	err := db.Get(&user, query, id)
+	err := db.GetContext(ctx, &user, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -92,7 +93,7 @@ func (r *UserRepository) GetUserByID(db *sqlx.DB, id int) (models.User, error) {
 	return user, nil
 }
 
-func (r *UserRepository) GetUserByUsername(db *sqlx.DB, username string) (models.User, error) {
+func (r *UserRepository) GetUserByUsername(ctx context.Context, db *sqlx.DB, username string) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -100,7 +101,7 @@ func (r *UserRepository) GetUserByUsername(db *sqlx.DB, username string) (models
    `
 
 	user := models.User{}
-	err := db.Get(&user, query, username)
+	err := db.GetContext(ctx, &user, query, username)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -114,7 +115,7 @@ func (r *UserRepository) GetUserByUsername(db *sqlx.DB, username string) (models
 	return user, nil
 }
 
-func (r *UserRepository) GetUserByEmail(db *sqlx.DB, email string) (models.User, error) {
+func (r *UserRepository) GetUserByEmail(ctx context.Context, db *sqlx.DB, email string) (models.User, error) {
 	query := `
        SELECT id, username, email, first_name, last_name, password_hash, created_at, updated_at, is_active
        FROM users
@@ -122,7 +123,7 @@ func (r *UserRepository) GetUserByEmail(db *sqlx.DB, email string) (models.User,
    `
 
 	user := models.User{}
-	err := db.Get(&user, query, email)
+	err := db.GetContext(ctx, &user, query, email)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -136,7 +137,7 @@ func (r *UserRepository) GetUserByEmail(db *sqlx.DB, email string) (models.User,
 	return user, nil
 }
 
-func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
+func (r *UserRepository) UpdateUser(ctx context.Context, db *sqlx.DB, user models.User) error {
 	query := `
 		UPDATE users
 		SET 
@@ -151,7 +152,7 @@ func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
 		    id = $8
 	`
 
-	_, err := db.Exec(
+	_, err := db.ExecContext(ctx,
 		query,
 		user.Username,
 		user.Email,
@@ -171,13 +172,13 @@ func (r *UserRepository) UpdateUser(db *sqlx.DB, user models.User) error {
 	return nil
 }
 
-func (r *UserRepository) DeleteUserByID(db *sqlx.DB, id int) error {
+func (r *UserRepository) DeleteUserByID(ctx context.Context, db *sqlx.DB, id int) error {
 	query := `
 		DELETE FROM users 
 		WHERE id = $1
 	`
 
-	result, err := db.Exec(query, id)
+	result, err := db.ExecContext(ctx, query, id)
 	if err != nil {
 		log.Printf("error deleting user (ID:%d): %v", id, err)
 		return err

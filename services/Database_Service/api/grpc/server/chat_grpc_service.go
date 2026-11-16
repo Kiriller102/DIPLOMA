@@ -72,7 +72,7 @@ func (s *ChatGRPCService) CreateChat(ctx context.Context, req *chatpb.CreateChat
 		chat.Type = models.ChatTypePrivate
 	}
 
-	err := s.chatService.CreateChat(&chat)
+	err := s.chatService.CreateChat(ctx, &chat)
 	if err != nil {
 		log.Printf("error: create chat error: %v", err)
 		return &chatpb.CreateChatResponse{
@@ -103,7 +103,7 @@ func (s *ChatGRPCService) GetChat(ctx context.Context, req *chatpb.GetChatReques
 	if err := s.access.RequireChat(ctx, int(req.Id), false); err != nil {
 		return nil, err
 	}
-	chat, err := s.chatService.GetChatByID(int(req.Id))
+	chat, err := s.chatService.GetChatByID(ctx, int(req.Id))
 	if err != nil {
 		log.Printf("error: get chat by id error: %v", err)
 		return &chatpb.GetChatResponse{
@@ -167,7 +167,7 @@ func (s *ChatGRPCService) UpdateChat(ctx context.Context, req *chatpb.UpdateChat
 	if err := s.access.RequireChat(ctx, chat.ID, true); err != nil {
 		return nil, err
 	}
-	err := s.chatService.UpdateChat(chat)
+	err := s.chatService.UpdateChat(ctx, chat)
 	if err != nil {
 		log.Printf("error: update chat error: %v", err)
 		return &chatpb.UpdateChatResponse{
@@ -195,7 +195,7 @@ func (s *ChatGRPCService) DeleteChat(ctx context.Context, req *chatpb.DeleteChat
 	if err := s.access.RequireChat(ctx, int(req.Id), true); err != nil {
 		return nil, err
 	}
-	err := s.chatService.DeleteChatByID(int(req.Id))
+	err := s.chatService.DeleteChatByID(ctx, int(req.Id))
 	if err != nil {
 		log.Printf("error: delete chat by id error: %v", err)
 		return &chatpb.DeleteChatResponse{

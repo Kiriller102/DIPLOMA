@@ -29,7 +29,7 @@ func (cpc *ChatParticipantController) CreateChatParticipant(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err := cpc.chatParticipantService.CreateChatParticipant(&chatParticipant)
+	err := cpc.chatParticipantService.CreateChatParticipant(c.Request.Context(), &chatParticipant)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -49,7 +49,7 @@ func (cpc *ChatParticipantController) GetChatParticipantsByChatID(c *gin.Context
 		respondError(c, err)
 		return
 	}
-	participants, err := cpc.chatParticipantService.GetAllChatParticipants(chatID)
+	participants, err := cpc.chatParticipantService.GetAllChatParticipants(c.Request.Context(), chatID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -84,7 +84,7 @@ func (cpc *ChatParticipantController) DeleteChatParticipantByUserID(c *gin.Conte
 		respondError(c, err)
 		return
 	}
-	err = cpc.chatParticipantService.DeleteParticipantByUserID(chatPart)
+	err = cpc.chatParticipantService.DeleteParticipantByUserID(c.Request.Context(), chatPart)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -108,7 +108,7 @@ func (cpc *ChatParticipantController) GetAllChatsByUserID(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	chats, err := cpc.chatParticipantService.GetChatsIdsByUserID(userID)
+	chats, err := cpc.chatParticipantService.GetChatsIdsByUserID(c.Request.Context(), userID)
 	if err != nil {
 		respondError(c, err)
 		return

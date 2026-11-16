@@ -36,7 +36,7 @@ func (mc *MessageController) CreateMessage(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err := mc.messageService.CreateMessage(&message)
+	err := mc.messageService.CreateMessage(c.Request.Context(), &message)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -99,13 +99,20 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		return
 	}
 
-	if err := mc.access.RequireChat(c.Request.Context(), chatID, false); err != nil {
+	ctx := c.Request.Context()
+	if err := mc.access.RequireChat(ctx, chatID, false); err != nil {
+		if ctx.Err() != nil {
+			return
+		}
 		respondError(c, err)
 		return
 	}
-	messages, err := mc.messageService.GetMessagesByChatID(chatID)
+	messages, err := mc.messageService.GetMessagesByChatID(ctx, chatID)
 
 	if err != nil {
+		if ctx.Err() != nil {
+			return
+		}
 		respondError(c, err)
 		return
 	}
@@ -140,13 +147,13 @@ func (mc *MessageController) UpdateMessage(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err = mc.messageService.UpdateMessage(message)
+	err = mc.messageService.UpdateMessage(c.Request.Context(), message)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
 
-	message, err = mc.messageService.GetMessageByID(id)
+	message, err = mc.messageService.GetMessageByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return

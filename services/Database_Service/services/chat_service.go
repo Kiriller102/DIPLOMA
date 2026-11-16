@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -34,7 +35,7 @@ func NewChatService(db *sqlx.DB) (*ChatService, error) {
 	}, nil
 }
 
-func (s *ChatService) CreateChat(chat *models.Chat) error {
+func (s *ChatService) CreateChat(ctx context.Context, chat *models.Chat) error {
 	if chat != nil {
 		chat.Name = strings.TrimSpace(chat.Name)
 	}
@@ -47,11 +48,11 @@ func (s *ChatService) CreateChat(chat *models.Chat) error {
 		}
 	}
 	chat.CreatedAt = time.Now().UTC()
-	return s.chatRepo.CreateChat(s.db, chat)
+	return s.chatRepo.CreateChat(ctx, s.db, chat)
 }
 
-func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
-	chat, err := s.chatRepo.GetChatByID(s.db, id)
+func (s *ChatService) GetChatByID(ctx context.Context, id int) (models.Chat, error) {
+	chat, err := s.chatRepo.GetChatByID(ctx, s.db, id)
 	if err != nil {
 		log.Printf("error: chatRepo.GetChatByID error: %v", err)
 		return models.Chat{}, err
@@ -64,13 +65,13 @@ func (s *ChatService) GetChatByID(id int) (models.Chat, error) {
 	return chat, nil
 }
 
-func (s *ChatService) UpdateChat(chat models.Chat) error {
+func (s *ChatService) UpdateChat(ctx context.Context, chat models.Chat) error {
 	if strings.TrimSpace(chat.Name) == "" || utf8.RuneCountInString(chat.Name) > 100 {
 		log.Printf("error: chat.Name is empty (chat.ID: %d)", chat.ID)
 		return fmt.Errorf("%w: chat.Name is empty", ErrInvalidInput)
 	}
 
-	ch, err := s.chatRepo.GetChatByID(s.db, chat.ID)
+	ch, err := s.chatRepo.GetChatByID(ctx, s.db, chat.ID)
 	if err != nil {
 		log.Printf("error: chatRepo.GetChatByID error: %v", err)
 		return err
@@ -82,7 +83,7 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 	}
 	ch.Name = chat.Name
 
-	err = s.chatRepo.UpdateChat(s.db, ch)
+	err = s.chatRepo.UpdateChat(ctx, s.db, ch)
 	if err != nil {
 		log.Printf("error: chatRepo.UpdateChat error: %v", err)
 		return err
@@ -91,13 +92,13 @@ func (s *ChatService) UpdateChat(chat models.Chat) error {
 	return nil
 }
 
-func (s *ChatService) DeleteChatByID(id int) error {
+func (s *ChatService) DeleteChatByID(ctx context.Context, id int) error {
 	if id <= 0 {
 		log.Printf("error: DeleteChatByID id is zero")
 		return fmt.Errorf("%w: chat id is required", ErrInvalidInput)
 	}
 
-	if c, err := s.chatRepo.GetChatByID(s.db, id); err != nil {
+	if c, err := s.chatRepo.GetChatByID(ctx, s.db, id); err != nil {
 		log.Printf("error: chatRepo.GetChatByID error: %v", err)
 		return err
 	} else if c.ID == 0 {
@@ -105,7 +106,7 @@ func (s *ChatService) DeleteChatByID(id int) error {
 		return sql.ErrNoRows
 	}
 
-	err := s.chatRepo.DeleteChatByID(s.db, id)
+	err := s.chatRepo.DeleteChatByID(ctx, s.db, id)
 	if err != nil {
 		log.Printf("error: chatRepo.DeleteChat error: %v", err)
 		return err

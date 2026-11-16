@@ -98,7 +98,7 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 		}, grpcstatus.Error(codes.InvalidArgument, "grpc error getting user")
 	}
 
-	user, err := s.userService.GetUser(u)
+	user, err := s.userService.GetUser(ctx, u)
 	if err != nil {
 		log.Printf("grpc error getting user: %v", err)
 		return &userpb.GetUserResponse{
@@ -131,7 +131,7 @@ func (s *UserGRPCService) GetUser(ctx context.Context, req *userpb.GetUserReques
 }
 
 func (s *UserGRPCService) GetAllUsers(ctx context.Context, _ *emptypb.Empty) (*userpb.GetAllUsersResponse, error) {
-	users, err := s.userService.GetAllUsers()
+	users, err := s.userService.GetAllUsers(ctx)
 	if err != nil {
 		log.Printf("grpc error getting all users: %v", err)
 		return &userpb.GetAllUsersResponse{
@@ -195,7 +195,7 @@ func (s *UserGRPCService) UpdateUser(ctx context.Context, req *userpb.UpdateUser
 	if user.PasswordHash != "" || user.Email != "" {
 		return nil, grpcstatus.Error(codes.InvalidArgument, "email and password cannot be changed via profile")
 	}
-	err := s.userService.UpdateUser(user)
+	err := s.userService.UpdateUser(ctx, user)
 	if err != nil {
 		log.Printf("grpc error updating user: %v", err)
 		return &userpb.UpdateUserResponse{
@@ -224,7 +224,7 @@ func (s *UserGRPCService) DeleteUser(ctx context.Context, req *userpb.DeleteUser
 	if err := s.access.RequireSelf(ctx, int(req.Id)); err != nil {
 		return nil, err
 	}
-	err := s.userService.DeleteUser(int(req.Id))
+	err := s.userService.DeleteUser(ctx, int(req.Id))
 	if err != nil {
 		log.Printf("grpc error deleting user: %v", err)
 		return &userpb.DeleteUserResponse{

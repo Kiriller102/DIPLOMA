@@ -93,7 +93,7 @@ func TestEncryptedStorageAndLegacyMigration(t *testing.T) {
 	const text = "Секретный текст 👋"
 	encrypted := fixture.seal(t, text, 1, 1, 1, 0)
 	message := models.Message{ChatID: 1, SenderID: 1, Content: encrypted, EncryptionAlgorithm: models.EncryptionAlgorithmKuznechik}
-	if err = svc.CreateMessage(&message); err != nil {
+	if err = svc.CreateMessage(context.Background(), &message); err != nil {
 		t.Fatal(err)
 	}
 	var stored models.Message
@@ -103,10 +103,10 @@ func TestEncryptedStorageAndLegacyMigration(t *testing.T) {
 	if stored.Content != encrypted || strings.Contains(stored.Content, text) || stored.CryptoVersion != 1 || stored.EncryptionAlgorithm != models.EncryptionAlgorithmAES {
 		t.Fatalf("unencrypted or misleading stored message: %+v", stored)
 	}
-	if err = svc.CreateMessage(&message); err == nil {
+	if err = svc.CreateMessage(context.Background(), &message); err == nil {
 		t.Fatal("replayed client message id accepted")
 	}
-	if err = svc.CreateMessage(&models.Message{ChatID: 1, SenderID: 1, Content: "plaintext"}); err == nil {
+	if err = svc.CreateMessage(context.Background(), &models.Message{ChatID: 1, SenderID: 1, Content: "plaintext"}); err == nil {
 		t.Fatal("plaintext accepted")
 	}
 	for _, mutate := range []func(*e2ee.Envelope){
@@ -124,12 +124,12 @@ func TestEncryptedStorageAndLegacyMigration(t *testing.T) {
 		}
 		mutate(&envelope)
 		raw, _ := json.Marshal(envelope)
-		if err = svc.CreateMessage(&models.Message{ChatID: 1, SenderID: 1, Content: e2ee.Prefix + string(raw)}); err == nil {
+		if err = svc.CreateMessage(context.Background(), &models.Message{ChatID: 1, SenderID: 1, Content: e2ee.Prefix + string(raw)}); err == nil {
 			t.Fatal("tampered encrypted envelope accepted")
 		}
 	}
 	repoReaders := []func() ([]models.Message, error){
-		func() ([]models.Message, error) { return svc.GetMessagesByChatID(1) },
+		func() ([]models.Message, error) { return svc.GetMessagesByChatID(context.Background(), 1) },
 		func() ([]models.Message, error) { return svc.GetMessagesAfter(context.Background(), 1, 0) },
 	}
 	for _, read := range repoReaders {
@@ -166,7 +166,7 @@ func TestEncryptedStorageAndLegacyMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	migrated, err := svc.GetMessageByID(legacyID)
+	migrated, err := svc.GetMessageByID(context.Background(), legacyID)
 	if err != nil || migrated.SenderID != 1 || migrated.Content != legacyCipher || migrated.CryptoVersion != 1 || migrated.SentAt.IsZero() {
 		t.Fatalf("migration lost data: %+v %v", migrated, err)
 	}
@@ -176,15 +176,15 @@ func TestEncryptedStorageAndLegacyMigration(t *testing.T) {
 	}
 	staleRecipients := fixture.seal(t, "stale recipient", 1, 1, 1, 0)
 	participants := repository.ChatParticipantRepository{}
-	if err = participants.DeleteParticipant(db, models.ChatParticipant{ChatID: 1, UserID: 2}); err != nil {
+	if err = participants.DeleteParticipant(context.Background(), db, models.ChatParticipant{ChatID: 1, UserID: 2}); err != nil {
 		t.Fatal(err)
 	}
-	if err = svc.CreateMessage(&models.Message{ChatID: 1, SenderID: 1, Content: staleRecipients}); err == nil {
+	if err = svc.CreateMessage(context.Background(), &models.Message{ChatID: 1, SenderID: 1, Content: staleRecipients}); err == nil {
 		t.Fatal("message for removed participant accepted")
 	}
 	fixture.identities = fixture.identities[:1]
 	freshRecipients := fixture.seal(t, "current recipients", 1, 1, 1, 0)
-	if err = svc.CreateMessage(&models.Message{ChatID: 1, SenderID: 1, Content: freshRecipients}); err != nil {
+	if err = svc.CreateMessage(context.Background(), &models.Message{ChatID: 1, SenderID: 1, Content: freshRecipients}); err != nil {
 		t.Fatal(err)
 	}
 }

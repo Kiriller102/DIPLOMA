@@ -43,10 +43,10 @@ func (s *CryptoService) ChatKeys(ctx context.Context, chatID int) ([]e2ee.Public
 	return keys, err
 }
 
-func (s *MessageService) validateEncryption(tx *sqlx.Tx, message *models.Message, signerID, legacyID int) error {
+func (s *MessageService) validateEncryption(ctx context.Context, tx *sqlx.Tx, message *models.Message, signerID, legacyID int) error {
 	keys := make([]e2ee.PublicIdentity, 0)
 	// Hold participant rows until commit, including against cascading account deletion.
-	err := tx.Select(&keys, `SELECT p.user_id,COALESCE(i.key_id,'') AS key_id,COALESCE(i.exchange_key,'') AS exchange_key,COALESCE(i.signing_key,'') AS signing_key
+	err := tx.SelectContext(ctx, &keys, `SELECT p.user_id,COALESCE(i.key_id,'') AS key_id,COALESCE(i.exchange_key,'') AS exchange_key,COALESCE(i.signing_key,'') AS signing_key
         FROM chat_participants p LEFT JOIN crypto_identities i ON i.user_id=p.user_id
         WHERE p.chat_id=$1 ORDER BY p.user_id FOR SHARE OF p`, message.ChatID)
 	if err != nil {

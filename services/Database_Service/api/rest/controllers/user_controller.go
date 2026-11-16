@@ -39,8 +39,11 @@ func (uc *UserController) createUserLegacy(c *gin.Context) {
 }
 
 func (uc *UserController) GetUsers(c *gin.Context) {
-	users, err := uc.userService.GetAllUsers()
+	users, err := uc.userService.GetAllUsers(c.Request.Context())
 	if err != nil {
+		if c.Request.Context().Err() != nil {
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
 		return
 	}
@@ -72,7 +75,7 @@ func (uc *UserController) GetUser(c *gin.Context) {
 	}
 
 	user := models.User{ID: id, Username: username, Email: email}
-	user, err := uc.userService.GetUser(user)
+	user, err := uc.userService.GetUser(c.Request.Context(), user)
 	if err != nil {
 		respondError(c, err)
 
@@ -112,12 +115,12 @@ func (uc *UserController) UpdateUser(c *gin.Context) {
 	}
 	user.ID = id
 
-	err = uc.userService.UpdateUser(user)
+	err = uc.userService.UpdateUser(c.Request.Context(), user)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	user, err = uc.userService.GetUser(models.User{ID: id})
+	user, err = uc.userService.GetUser(c.Request.Context(), models.User{ID: id})
 	if err != nil {
 		respondError(c, err)
 		return
@@ -142,7 +145,7 @@ func (uc *UserController) DeleteUser(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err = uc.userService.DeleteUser(id)
+	err = uc.userService.DeleteUser(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return

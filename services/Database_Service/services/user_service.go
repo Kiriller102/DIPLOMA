@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -52,7 +53,7 @@ func (s *UserService) CreateUser(user *models.User) error {
 	return s.userRepo.CreateUser(s.db, user)
 }
 
-func (s *UserService) UpdateUser(user models.User) error {
+func (s *UserService) UpdateUser(ctx context.Context, user models.User) error {
 	//user.UpdatedAt = time.Now()
 	//if user.Email == "" || user.PasswordHash == "" {
 	//	return models.User{}, errors.New("email or password is empty")
@@ -90,7 +91,7 @@ func (s *UserService) UpdateUser(user models.User) error {
 		return fmt.Errorf("%w: user id is required", ErrInvalidInput)
 	}
 
-	usr, err := s.userRepo.GetUserByID(s.db, user.ID)
+	usr, err := s.userRepo.GetUserByID(ctx, s.db, user.ID)
 	if err != nil {
 		log.Printf("error get user by id: %s", err.Error())
 		return err
@@ -127,7 +128,7 @@ func (s *UserService) UpdateUser(user models.User) error {
 
 	usr.UpdatedAt = time.Now()
 
-	err = s.userRepo.UpdateUser(s.db, usr)
+	err = s.userRepo.UpdateUser(ctx, s.db, usr)
 	if err != nil {
 		log.Printf("error update user: %s", err.Error())
 		return err
@@ -136,8 +137,8 @@ func (s *UserService) UpdateUser(user models.User) error {
 	return nil
 }
 
-func (s *UserService) DeleteUser(id int) error {
-	if u, err := s.userRepo.GetUserByID(s.db, id); err != nil {
+func (s *UserService) DeleteUser(ctx context.Context, id int) error {
+	if u, err := s.userRepo.GetUserByID(ctx, s.db, id); err != nil {
 		log.Printf("error get user by id")
 		return err
 	} else if u.ID != id {
@@ -145,7 +146,7 @@ func (s *UserService) DeleteUser(id int) error {
 		return sql.ErrNoRows
 	}
 
-	err := s.userRepo.DeleteUserByID(s.db, id)
+	err := s.userRepo.DeleteUserByID(ctx, s.db, id)
 	if err != nil {
 		log.Printf("error delete user")
 		return err
@@ -154,25 +155,25 @@ func (s *UserService) DeleteUser(id int) error {
 	return nil
 }
 
-func (s *UserService) GetUser(user models.User) (models.User, error) {
+func (s *UserService) GetUser(ctx context.Context, user models.User) (models.User, error) {
 
 	u := models.User{}
 	var err error
 	switch {
 	case user.Email != "":
-		if u, err = s.userRepo.GetUserByEmail(s.db, user.Email); err != nil {
+		if u, err = s.userRepo.GetUserByEmail(ctx, s.db, user.Email); err != nil {
 			log.Printf("error get user by email")
 		} else if u == (models.User{}) {
 			log.Printf("error no users exist with email: %v", user.Email)
 		}
 	case user.Username != "":
-		if u, err = s.userRepo.GetUserByUsername(s.db, user.Username); err != nil {
+		if u, err = s.userRepo.GetUserByUsername(ctx, s.db, user.Username); err != nil {
 			log.Printf("error get user by username")
 		} else if u == (models.User{}) {
 			log.Printf("error no users exist with username: %v", user.Username)
 		}
 	default:
-		if u, err = s.userRepo.GetUserByID(s.db, user.ID); err != nil {
+		if u, err = s.userRepo.GetUserByID(ctx, s.db, user.ID); err != nil {
 			log.Printf("error get user by id")
 		} else if u.ID != user.ID {
 			log.Printf("error user not found: %v", user)
@@ -188,8 +189,8 @@ func (s *UserService) GetUser(user models.User) (models.User, error) {
 	return u, err
 }
 
-func (s *UserService) GetAllUsers() ([]models.User, error) {
-	users, err := s.userRepo.GetAllUsers(s.db)
+func (s *UserService) GetAllUsers(ctx context.Context) ([]models.User, error) {
+	users, err := s.userRepo.GetAllUsers(ctx, s.db)
 	if err != nil {
 		log.Printf("error get all users")
 		return nil, err

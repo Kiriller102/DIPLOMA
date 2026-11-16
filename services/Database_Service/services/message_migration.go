@@ -23,7 +23,7 @@ func (s *MessageService) EncryptLegacyMessage(ctx context.Context, id, signerID 
 		return models.Message{}, err
 	}
 	defer tx.Rollback()
-	if err = repository.LockChat(tx, chatID); err != nil {
+	if err = repository.LockChat(ctx, tx, chatID); err != nil {
 		return models.Message{}, err
 	}
 	var message models.Message

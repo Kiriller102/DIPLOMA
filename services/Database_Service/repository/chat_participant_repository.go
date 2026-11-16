@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
@@ -8,29 +9,29 @@ import (
 )
 
 type ChatParticipantRepositoryInterface interface {
-	CreateParticipant(db *sqlx.DB, participant models.ChatParticipant) error
-	GetParticipant(db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error)
-	GetAllChatParticipants(db *sqlx.DB, chatID int) ([]models.ChatParticipant, error)
+	CreateParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) error
+	GetParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error)
+	GetAllChatParticipants(ctx context.Context, db *sqlx.DB, chatID int) ([]models.ChatParticipant, error)
 	DeleteAllParticipantsByChatID(db *sqlx.DB, chatID int) error
-	DeleteParticipant(db *sqlx.DB, participant models.ChatParticipant) error
+	DeleteParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) error
 }
 
 type ChatParticipantRepository struct{}
 
-func (r *ChatParticipantRepository) CreateParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
-	tx, err := db.Beginx()
+func (r *ChatParticipantRepository) CreateParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) error {
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err = LockChat(tx, participant.ChatID); err != nil {
+	if err = LockChat(ctx, tx, participant.ChatID); err != nil {
 		return err
 	}
 	query := `
 		INSERT INTO chat_participants (chat_id, user_id, role, joined_at)
 		VALUES ($1, $2, $3, $4)
 	`
-	_, err = tx.Exec(query, participant.ChatID, participant.UserID, participant.UserRole, participant.JoinedAt)
+	_, err = tx.ExecContext(ctx, query, participant.ChatID, participant.UserID, participant.UserRole, participant.JoinedAt)
 	if err != nil {
 		log.Printf("error inserting participant: %v", err.Error())
 		return err
@@ -38,13 +39,13 @@ func (r *ChatParticipantRepository) CreateParticipant(db *sqlx.DB, participant m
 	return tx.Commit()
 }
 
-func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error) {
+func (r *ChatParticipantRepository) GetParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) (models.ChatParticipant, error) {
 	query := `
 		SELECT * FROM chat_participants WHERE chat_id = $1 AND user_id = $2
 	`
 
 	var chPart models.ChatParticipant
-	err := db.Get(&chPart, query, participant.ChatID, participant.UserID)
+	err := db.GetContext(ctx, &chPart, query, participant.ChatID, participant.UserID)
 	if err != nil {
 		log.Printf("error getting participant: %v", err.Error())
 		return models.ChatParticipant{}, err
@@ -53,15 +54,15 @@ func (r *ChatParticipantRepository) GetParticipant(db *sqlx.DB, participant mode
 	return chPart, nil
 }
 
-func (r *ChatParticipantRepository) GetAllChatParticipants(db *sqlx.DB, chatID int) ([]models.ChatParticipant, error) {
+func (r *ChatParticipantRepository) GetAllChatParticipants(ctx context.Context, db *sqlx.DB, chatID int) ([]models.ChatParticipant, error) {
 	participants := make([]models.ChatParticipant, 0)
-	err := db.Select(&participants, `SELECT chat_id, user_id, role, joined_at FROM chat_participants WHERE chat_id = $1 ORDER BY user_id`, chatID)
+	err := db.SelectContext(ctx, &participants, `SELECT chat_id, user_id, role, joined_at FROM chat_participants WHERE chat_id = $1 ORDER BY user_id`, chatID)
 	return participants, err
 }
 
-func (r *ChatParticipantRepository) GetAllChatsByUserID(db *sqlx.DB, userID int) ([]models.Chat, error) {
+func (r *ChatParticipantRepository) GetAllChatsByUserID(ctx context.Context, db *sqlx.DB, userID int) ([]models.Chat, error) {
 	chats := make([]models.Chat, 0)
-	err := db.Select(&chats, `SELECT c.id, c.name, c.type, c.created_by, c.created_at FROM chats c
+	err := db.SelectContext(ctx, &chats, `SELECT c.id, c.name, c.type, c.created_by, c.created_at FROM chats c
         JOIN chat_participants p ON p.chat_id = c.id WHERE p.user_id = $1 ORDER BY c.id`, userID)
 	return chats, err
 }
@@ -72,7 +73,7 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, c
 		return err
 	}
 	defer tx.Rollback()
-	if err = LockChat(tx, chatID); err != nil {
+	if err = LockChat(context.Background(), tx, chatID); err != nil {
 		return err
 	}
 	query := `
@@ -100,20 +101,20 @@ func (r *ChatParticipantRepository) DeleteAllParticipantsByChatID(db *sqlx.DB, c
 	return tx.Commit()
 }
 
-func (r *ChatParticipantRepository) DeleteParticipant(db *sqlx.DB, participant models.ChatParticipant) error {
-	tx, err := db.Beginx()
+func (r *ChatParticipantRepository) DeleteParticipant(ctx context.Context, db *sqlx.DB, participant models.ChatParticipant) error {
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err = LockChat(tx, participant.ChatID); err != nil {
+	if err = LockChat(ctx, tx, participant.ChatID); err != nil {
 		return err
 	}
 	query := `
 		DELETE FROM chat_participants
 		WHERE user_id = $1 AND chat_id = $2
 	`
-	result, err := tx.Exec(query, participant.UserID, participant.ChatID)
+	result, err := tx.ExecContext(ctx, query, participant.UserID, participant.ChatID)
 	if err != nil {
 		log.Printf("error deleting participants: %v", err.Error())
 		return err

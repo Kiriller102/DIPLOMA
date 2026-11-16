@@ -13,6 +13,9 @@ import (
 )
 
 func respondError(c *gin.Context, err error) {
+	if c.Request.Context().Err() != nil {
+		return
+	}
 	code, message := http.StatusInternalServerError, "internal server error"
 	var pg *pq.Error
 	switch {

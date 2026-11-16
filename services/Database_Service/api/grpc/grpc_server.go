@@ -82,6 +82,11 @@ func mapErrors(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 		return nil, status.Error(codes.NotFound, "not found")
 	case errors.Is(err, services.ErrInvalidInput):
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), ctx.Err() != nil:
+		if ctx.Err() != nil {
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
+		return nil, status.FromContextError(err).Err()
 	case errors.As(err, &pg):
 		switch pg.Code {
 		case "23505":
@@ -115,6 +120,12 @@ func authenticatedContext(ctx context.Context, method string, access *auth.Servi
 	}
 	if errors.Is(err, auth.ErrForbidden) {
 		return nil, status.Error(codes.PermissionDenied, "permission denied")
+	}
+	if ctx.Err() != nil {
+		return nil, status.FromContextError(ctx.Err()).Err()
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return nil, status.FromContextError(err).Err()
 	}
 	log.Printf("authenticate gRPC request: %v", err)
 	return nil, status.Error(codes.Unavailable, "authentication temporarily unavailable")

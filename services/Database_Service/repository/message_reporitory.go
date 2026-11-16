@@ -11,23 +11,23 @@ import (
 )
 
 type MessageRepositoryInterface interface {
-	CreateMessage(db sqlx.Ext, message *models.Message) error
-	GetMessageByID(db sqlx.Queryer, id int) (models.Message, error)
+	CreateMessage(ctx context.Context, db sqlx.ExtContext, message *models.Message) error
+	GetMessageByID(ctx context.Context, db sqlx.QueryerContext, id int) (models.Message, error)
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
-	GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error)
-	UpdateMessage(db sqlx.Ext, message models.Message) error
+	GetMessagesByChatID(ctx context.Context, db *sqlx.DB, chatId int) ([]models.Message, error)
+	UpdateMessage(ctx context.Context, db sqlx.ExtContext, message models.Message) error
 	DeleteMessageByID(db *sqlx.DB, id int) error
 }
 
 type MessageRepository struct{}
 
-func (r *MessageRepository) CreateMessage(db sqlx.Ext, message *models.Message) error {
+func (r *MessageRepository) CreateMessage(ctx context.Context, db sqlx.ExtContext, message *models.Message) error {
 	query := `
 		INSERT INTO messages (chat_id, sender_id, content, encryption_algorithm, sent_at, crypto_version, client_id) VALUES ($1, $2, $3, $4::encryption_algorithm_type, $5, $6, $7) RETURNING id
 	`
 
-	err := db.QueryRowx(
+	err := db.QueryRowxContext(ctx,
 		query,
 		message.ChatID,
 		message.SenderID,
@@ -46,7 +46,7 @@ func (r *MessageRepository) CreateMessage(db sqlx.Ext, message *models.Message) 
 	return nil
 }
 
-func (r *MessageRepository) GetMessageByID(db sqlx.Queryer, id int) (models.Message, error) {
+func (r *MessageRepository) GetMessageByID(ctx context.Context, db sqlx.QueryerContext, id int) (models.Message, error) {
 	var message models.Message
 
 	if id == 0 {
@@ -57,7 +57,7 @@ func (r *MessageRepository) GetMessageByID(db sqlx.Queryer, id int) (models.Mess
 		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id FROM messages WHERE id = $1
 	`
 
-	err := sqlx.Get(db, &message, query, id)
+	err := sqlx.GetContext(ctx, db, &message, query, id)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -142,7 +142,7 @@ func (r *MessageRepository) GetAllMessagesBySenderID(db *sqlx.DB, senderId strin
 	return messages, rows.Err()
 }
 
-func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]models.Message, error) {
+func (r *MessageRepository) GetMessagesByChatID(ctx context.Context, db *sqlx.DB, chatId int) ([]models.Message, error) {
 	messages := make([]models.Message, 0)
 
 	query := `
@@ -151,7 +151,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 		WHERE chat_id = $1
 		ORDER BY id
 	`
-	rows, err := db.Query(query, chatId)
+	rows, err := db.QueryContext(ctx, query, chatId)
 	if err != nil {
 		log.Printf("Error while getting all messages: %v", err)
 		return nil, err
@@ -181,7 +181,7 @@ func (r *MessageRepository) GetMessagesByChatID(db *sqlx.DB, chatId int) ([]mode
 	return messages, rows.Err()
 }
 
-func (r *MessageRepository) UpdateMessage(db sqlx.Ext, message models.Message) error {
+func (r *MessageRepository) UpdateMessage(ctx context.Context, db sqlx.ExtContext, message models.Message) error {
 	query := `
 		UPDATE messages
 		SET
@@ -190,7 +190,7 @@ func (r *MessageRepository) UpdateMessage(db sqlx.Ext, message models.Message) e
 		    id = $2
 	`
 
-	_, err := db.Exec(query, message.Content, message.ID, message.EncryptionAlgorithm, message.CryptoVersion, message.ClientID)
+	_, err := db.ExecContext(ctx, query, message.Content, message.ID, message.EncryptionAlgorithm, message.CryptoVersion, message.ClientID)
 
 	if err != nil {
 		log.Printf("rrror while updating message (ID: %d) into database: %v", message.ID, err)

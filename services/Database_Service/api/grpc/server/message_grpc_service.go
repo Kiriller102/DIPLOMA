@@ -60,7 +60,7 @@ func (s *MessageGRPCService) CreateMessage(ctx context.Context, req *messagepb.C
 	if err := s.access.RequireChat(ctx, message.ChatID, false); err != nil {
 		return nil, err
 	}
-	err := s.messageService.CreateMessage(&message)
+	err := s.messageService.CreateMessage(ctx, &message)
 	if err != nil {
 		log.Println("grpc error creating message: ", err)
 		return &messagepb.CreateMessageResponse{
@@ -90,7 +90,7 @@ func (s *MessageGRPCService) GetMessage(ctx context.Context, req *messagepb.GetM
 	if err := s.access.RequireMessage(ctx, int(req.Id), false); err != nil {
 		return nil, err
 	}
-	message, err := s.messageService.GetMessageByID(int(req.Id))
+	message, err := s.messageService.GetMessageByID(ctx, int(req.Id))
 	if err != nil {
 		log.Println("grpc error getting message: ", err)
 		return &messagepb.GetMessageResponse{
@@ -161,7 +161,7 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 	if err := s.access.RequireMessage(ctx, message.ID, true); err != nil {
 		return nil, err
 	}
-	err := s.messageService.UpdateMessage(message)
+	err := s.messageService.UpdateMessage(ctx, message)
 	if err != nil {
 		log.Println("grpc error updating message: ", err)
 		return &messagepb.UpdateMessageResponse{
@@ -189,10 +189,16 @@ func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messa
 	}
 
 	if err := s.access.RequireChat(ctx, int(req.ChatId), false); err != nil {
+		if ctx.Err() != nil {
+			return nil, grpcstatus.FromContextError(ctx.Err()).Err()
+		}
 		return nil, err
 	}
-	messages, err := s.messageService.GetMessagesByChatID(int(req.ChatId))
+	messages, err := s.messageService.GetMessagesByChatID(ctx, int(req.ChatId))
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, grpcstatus.FromContextError(ctx.Err()).Err()
+		}
 		log.Println("grpc error getting message: ", err)
 		return &messagepb.GetMessagesByChatIDResponse{
 			Result: &messagepb.GetMessagesByChatIDResponse_Error{

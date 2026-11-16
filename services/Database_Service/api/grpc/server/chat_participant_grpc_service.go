@@ -55,7 +55,7 @@ func (s *ChatParticipantGRPCService) CreateChatParticipant(ctx context.Context, 
 	if err := s.access.RequireChat(ctx, chatParticipant.ChatID, true); err != nil {
 		return nil, err
 	}
-	err := s.chatPartService.CreateChatParticipant(&chatParticipant)
+	err := s.chatPartService.CreateChatParticipant(ctx, &chatParticipant)
 	if err != nil {
 		return &chatpartpb.CreateChatParticipantResponse{
 			Error: &status.Status{
@@ -87,7 +87,7 @@ func (s *ChatParticipantGRPCService) DeleteChatParticipant(ctx context.Context, 
 	if err := s.access.RequireRemoveParticipant(ctx, cp.ChatID, cp.UserID); err != nil {
 		return nil, err
 	}
-	err := s.chatPartService.DeleteParticipantByUserID(cp)
+	err := s.chatPartService.DeleteParticipantByUserID(ctx, cp)
 	if err != nil {
 		return &chatpartpb.DeleteChatParticipantResponse{
 			Error: &status.Status{
@@ -146,7 +146,7 @@ func (s *ChatParticipantGRPCService) GetChatParticipants(ctx context.Context, re
 	if err := s.access.RequireChat(ctx, int(req.ChatId), false); err != nil {
 		return nil, err
 	}
-	chatParticipants, err := s.chatPartService.GetAllChatParticipants(int(req.ChatId))
+	chatParticipants, err := s.chatPartService.GetAllChatParticipants(ctx, int(req.ChatId))
 	if err != nil {
 		log.Printf("error: GetChatParticipants is invalid: %v", err.Error())
 		return &chatpartpb.GetChatParticipantsByChatIDResponse{

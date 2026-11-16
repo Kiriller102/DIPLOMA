@@ -31,7 +31,7 @@ func (cc *ChatController) CreateChat(c *gin.Context) {
 	}
 
 	chat.CreatedBy = cc.access.EffectiveUserID(c.Request.Context(), chat.CreatedBy)
-	err := cc.chatService.CreateChat(&chat)
+	err := cc.chatService.CreateChat(c.Request.Context(), &chat)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -55,7 +55,7 @@ func (cc *ChatController) GetChat(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	chat, err := cc.chatService.GetChatByID(chatID)
+	chat, err := cc.chatService.GetChatByID(c.Request.Context(), chatID)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -82,12 +82,12 @@ func (cc *ChatController) UpdateChat(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err = cc.chatService.UpdateChat(chat)
+	err = cc.chatService.UpdateChat(c.Request.Context(), chat)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	chat, err = cc.chatService.GetChatByID(id)
+	chat, err = cc.chatService.GetChatByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -110,7 +110,7 @@ func (cc *ChatController) DeleteChat(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	err = cc.chatService.DeleteChatByID(id)
+	err = cc.chatService.DeleteChatByID(c.Request.Context(), id)
 	if err != nil {
 		respondError(c, err)
 		return
