@@ -102,6 +102,22 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		return
 	}
 
+	var beforeID *int
+	if values, exists := c.Request.URL.Query()["before_id"]; exists {
+		if len(values) != 1 {
+			logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "before_id must be specified once"})
+			return
+		}
+		id, err := strconv.Atoi(values[0])
+		if err != nil || id <= 0 {
+			logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "before_id must be a positive integer"})
+			return
+		}
+		beforeID = &id
+	}
+
 	ctx := c.Request.Context()
 	if err := mc.access.RequireChat(ctx, chatID, false); err != nil {
 		logging.Capture(ctx, err, "access")
@@ -111,7 +127,7 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	messages, err := mc.messageService.GetMessagesByChatID(ctx, chatID)
+	page, err := mc.messageService.GetMessagesPageByChatID(ctx, chatID, beforeID)
 
 	if err != nil {
 		logging.Capture(ctx, err, "service")
@@ -122,7 +138,7 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"messages": messages})
+	c.JSON(http.StatusOK, page)
 }
 
 func (mc *MessageController) UpdateMessage(c *gin.Context) {
