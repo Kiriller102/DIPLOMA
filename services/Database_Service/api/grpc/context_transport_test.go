@@ -120,7 +120,7 @@ func TestContextStageCGRPCClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"user_update", "history", "authentication"} {
-		for _, mode := range []string{"cancel", "deadline"} {
+		for _, mode := range []string{"cancel", "deadline", "server_deadline"} {
 			t.Run(name+"/"+mode, func(t *testing.T) {
 				ctxSetup, cancelSetup := context.WithTimeout(context.Background(), 20*time.Second)
 				defer cancelSetup()
@@ -158,10 +158,27 @@ func TestContextStageCGRPCClient(t *testing.T) {
 				if err = tx.GetContext(ctxSetup, &blocker, "SELECT pg_backend_pid()"); err != nil {
 					t.Fatal(err)
 				}
-				serverDone := make(chan error, 1)
+				type serverResult struct {
+					err               error
+					contextErr        error
+					hasDeadline       bool
+					deadlineRemaining time.Duration
+				}
+				serverDone := make(chan serverResult, 1)
 				observe := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (interface{}, error) {
+					if mode == "server_deadline" {
+						// Isolate the server timer from the client's later timeout.
+						var cancel context.CancelFunc
+						ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+						defer cancel()
+					}
+					deadline, hasDeadline := ctx.Deadline()
+					remaining := time.Duration(0)
+					if hasDeadline {
+						remaining = time.Until(deadline)
+					}
 					response, err := next(ctx, req)
-					serverDone <- err
+					serverDone <- serverResult{err: err, contextErr: ctx.Err(), hasDeadline: hasDeadline, deadlineRemaining: remaining}
 					return response, err
 				}
 				server := grpc.NewServer(grpc.ChainUnaryInterceptor(observe, mapErrors, authenticate(access)))
@@ -193,6 +210,8 @@ func TestContextStageCGRPCClient(t *testing.T) {
 				var cancel context.CancelFunc
 				if mode == "deadline" {
 					ctx, cancel = context.WithTimeout(parent, 2*time.Second)
+				} else if mode == "server_deadline" {
+					ctx, cancel = context.WithTimeout(parent, 10*time.Second)
 				} else {
 					ctx, cancel = context.WithCancel(parent)
 				}
@@ -226,7 +245,7 @@ func TestContextStageCGRPCClient(t *testing.T) {
 				t.Logf("backend=%d blocker=%d SQL=%s", pid, blocker, stage)
 				if mode == "cancel" {
 					cancel()
-				} else {
+				} else if mode == "deadline" {
 					select {
 					case <-ctx.Done():
 					case <-time.After(3 * time.Second):
@@ -234,7 +253,7 @@ func TestContextStageCGRPCClient(t *testing.T) {
 					}
 				}
 				want := codes.Canceled
-				if mode == "deadline" {
+				if mode != "cancel" {
 					want = codes.DeadlineExceeded
 				}
 				select {
@@ -245,21 +264,52 @@ func TestContextStageCGRPCClient(t *testing.T) {
 				case <-time.After(5 * time.Second):
 					t.Fatal("client did not finish")
 				}
-				var serverError error
+				wantClientContext := error(nil)
+				if mode == "cancel" {
+					wantClientContext = context.Canceled
+				} else if mode == "deadline" {
+					wantClientContext = context.DeadlineExceeded
+				}
+				if ctx.Err() != wantClientContext {
+					t.Errorf("client context=%v, want %v", ctx.Err(), wantClientContext)
+				}
+				var result serverResult
 				select {
-				case serverError = <-serverDone:
+				case result = <-serverDone:
 				case <-time.After(time.Second):
 					t.Error("DEFECT: client finished but server SQL did not stop")
 					cleanup()
 					select {
-					case serverError = <-serverDone:
+					case result = <-serverDone:
 					case <-time.After(5 * time.Second):
 						t.Fatal("server did not finish after cleanup")
 					}
 				}
-				if status.Code(serverError) != want {
-					t.Errorf("DEFECT: server interceptor=%v, want %s", serverError, want)
+				if mode != "cancel" && (!result.hasDeadline || result.deadlineRemaining <= 0 || result.deadlineRemaining > 2*time.Second+time.Millisecond) {
+					t.Errorf("server deadline missing or outside request budget: present=%t remaining=%s", result.hasDeadline, result.deadlineRemaining)
 				}
+				switch mode {
+				case "cancel":
+					if result.contextErr != context.Canceled {
+						t.Errorf("server context=%v, want Canceled", result.contextErr)
+					}
+				case "server_deadline":
+					if result.contextErr != context.DeadlineExceeded {
+						t.Errorf("server context=%v, want DeadlineExceeded", result.contextErr)
+					}
+				case "deadline":
+					// A client's expired timer sends a stream reset. It can cancel
+					// the server context before the independently scheduled server
+					// timer fires. The interceptor must map the actual server cause.
+					if result.contextErr != context.Canceled && result.contextErr != context.DeadlineExceeded {
+						t.Errorf("server context did not stop after client deadline: %v", result.contextErr)
+					}
+				}
+				wantServer := status.FromContextError(result.contextErr).Code()
+				if status.Code(result.err) != wantServer {
+					t.Errorf("DEFECT: server interceptor=%v, context=%v, want %s", result.err, result.contextErr, wantServer)
+				}
+				t.Logf("client=%s server=%s server_context=%v deadline_remaining=%s", want, status.Code(result.err), result.contextErr, result.deadlineRemaining)
 				grpcTestWait(t, "SQL terminated and transaction locks released", func(c context.Context) (bool, error) {
 					var stopped bool
 					e := admin.GetContext(c, &stopped, `SELECT NOT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND (state='active' OR state LIKE 'idle in transaction%')) AND NOT EXISTS(SELECT 1 FROM pg_locks WHERE pid=$1 AND locktype<>'virtualxid')`, pid)
