@@ -67,7 +67,6 @@ func (s *MessageService) CreateMessage(ctx context.Context, message *models.Mess
 func (s *MessageService) GetMessagesByChatID(ctx context.Context, ChatID int) ([]models.Message, error) {
 	messages, err := s.messageRepo.GetMessagesByChatID(ctx, s.db, ChatID)
 	if err != nil {
-		log.Printf("error: messageRepo.GetMessagesByChatID error: %v", err)
 		return nil, err
 	}
 

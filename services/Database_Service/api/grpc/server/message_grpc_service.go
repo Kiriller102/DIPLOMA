@@ -9,6 +9,7 @@ import (
 	"log"
 	messagepb "project/services/Database_Service/api/grpc/pb/message"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 )
@@ -177,7 +178,7 @@ func (s *MessageGRPCService) UpdateMessage(ctx context.Context, req *messagepb.U
 
 func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messagepb.GetMessagesByChatIDRequest) (*messagepb.GetMessagesByChatIDResponse, error) {
 	if req == nil || req.ChatId == 0 {
-		log.Println("grpc error getting message: GetMessagesByChatIDRequest is nil")
+		logging.Capture(ctx, services.ErrInvalidInput, "validation")
 		return &messagepb.GetMessagesByChatIDResponse{
 			Result: &messagepb.GetMessagesByChatIDResponse_Error{
 				Error: &status.Status{
@@ -189,6 +190,7 @@ func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messa
 	}
 
 	if err := s.access.RequireChat(ctx, int(req.ChatId), false); err != nil {
+		logging.Capture(ctx, err, "access")
 		if ctx.Err() != nil {
 			return nil, grpcstatus.FromContextError(ctx.Err()).Err()
 		}
@@ -196,10 +198,10 @@ func (s *MessageGRPCService) GetMessagesByChatID(ctx context.Context, req *messa
 	}
 	messages, err := s.messageService.GetMessagesByChatID(ctx, int(req.ChatId))
 	if err != nil {
+		logging.Capture(ctx, err, "service")
 		if ctx.Err() != nil {
 			return nil, grpcstatus.FromContextError(ctx.Err()).Err()
 		}
-		log.Println("grpc error getting message: ", err)
 		return &messagepb.GetMessagesByChatIDResponse{
 			Result: &messagepb.GetMessagesByChatIDResponse_Error{
 				Error: &status.Status{

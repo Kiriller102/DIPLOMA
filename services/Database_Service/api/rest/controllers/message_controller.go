@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 	"strconv"
@@ -91,16 +92,19 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 	chatID, err := strconv.Atoi(c.Param("chat_id"))
 
 	if err != nil {
+		logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if chatID <= 0 {
+		logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ChatID is empty"})
 		return
 	}
 
 	ctx := c.Request.Context()
 	if err := mc.access.RequireChat(ctx, chatID, false); err != nil {
+		logging.Capture(ctx, err, "access")
 		if ctx.Err() != nil {
 			return
 		}
@@ -110,6 +114,7 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 	messages, err := mc.messageService.GetMessagesByChatID(ctx, chatID)
 
 	if err != nil {
+		logging.Capture(ctx, err, "service")
 		if ctx.Err() != nil {
 			return
 		}

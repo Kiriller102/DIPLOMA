@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
+	"project/services/Database_Service/services"
 	"strings"
 	"time"
 
@@ -25,8 +29,32 @@ type HTTPServer struct {
 func NewHTTPServer(userController *controllers.UserController,
 	messageController *controllers.MessageController,
 	chatController *controllers.ChatController,
-	ChatParticipantController *controllers.ChatParticipantController, db *sqlx.DB, access *auth.Service, secureCookies bool) *HTTPServer {
-	router := gin.Default()
+	ChatParticipantController *controllers.ChatParticipantController, db *sqlx.DB, access *auth.Service, secureCookies bool, loggers ...*slog.Logger) *HTTPServer {
+	logger := logging.New(os.Stderr, nil)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	classifier := logging.NewClassifier(logging.Sentinels{InvalidInput: services.ErrInvalidInput, Unauthenticated: auth.ErrUnauthenticated, Forbidden: auth.ErrForbidden})
+	pilot := func(c *gin.Context) bool {
+		return c.Request.Method == http.MethodGet && c.FullPath() == "/messages/:chat_id"
+	}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		if !pilot(c) {
+			c.Next()
+			return
+		}
+		ctx, completion := logging.Begin(c.Request.Context(), logger, classifier, "rest", logging.MessageHistory)
+		c.Request = c.Request.WithContext(ctx)
+		defer func() {
+			if c.Writer.Status() >= 500 {
+				logging.Capture(ctx, errors.New("unclassified server failure"), "response")
+			}
+			completion.Finish(ctx, slog.String("method", c.Request.Method), slog.String("route", "/messages/:chat_id"),
+				slog.Int("http_status", c.Writer.Status()), slog.Bool("response_written", c.Writer.Written()), slog.Int("response_bytes", c.Writer.Size()), slog.String("client_ip", c.ClientIP()))
+		}()
+		c.Next()
+	}, gin.LoggerWithConfig(gin.LoggerConfig{Skip: pilot}), gin.Recovery())
 
 	router.SetTrustedProxies(nil)
 	pollCtx, cancelPolls := context.WithCancel(context.Background())
@@ -78,6 +106,7 @@ func NewHTTPServer(userController *controllers.UserController,
 				return
 			}
 		}
+		logging.Capture(c.Request.Context(), err, "authentication")
 		if c.Request.Context().Err() != nil {
 			c.Abort()
 			return

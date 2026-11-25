@@ -17,6 +17,7 @@ import (
 	"project/services/Database_Service/api/rest"
 	"project/services/Database_Service/api/rest/controllers"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/migrations"
 	"project/services/Database_Service/repository"
 	"project/services/Database_Service/services"
@@ -71,9 +72,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	operationLogger := logging.New(os.Stderr, nil)
 	httpServer := rest.NewHTTPServer(controllers.NewUserController(users, access), controllers.NewMessageController(messages, access),
-		controllers.NewChatController(chats, access), controllers.NewChatParticipantController(participants, access), db, access, env("COOKIE_SECURE", "false") == "true")
-	grpcServer := grpc.NewGRPCServer(access)
+		controllers.NewChatController(chats, access), controllers.NewChatParticipantController(participants, access), db, access, env("COOKIE_SECURE", "false") == "true", operationLogger)
+	grpcServer := grpc.NewGRPCServer(access, operationLogger)
 	grpcServer.RegisterServices(users, messages, chats, participants, access)
 	httpListener, err := net.Listen("tcp", ":"+env("HTTP_PORT", "8080"))
 	if err != nil {

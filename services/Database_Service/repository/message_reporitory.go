@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/models"
 )
 
@@ -153,8 +154,7 @@ func (r *MessageRepository) GetMessagesByChatID(ctx context.Context, db *sqlx.DB
 	`
 	rows, err := db.QueryContext(ctx, query, chatId)
 	if err != nil {
-		log.Printf("Error while getting all messages: %v", err)
-		return nil, err
+		return nil, logging.Annotate(err, logging.MessageHistory, "query")
 	}
 
 	defer rows.Close()
@@ -170,15 +170,14 @@ func (r *MessageRepository) GetMessagesByChatID(ctx context.Context, db *sqlx.DB
 			&message.SentAt, &message.CryptoVersion, &message.ClientID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return messages, rows.Err()
+				return messages, logging.Annotate(rows.Err(), logging.MessageHistory, "iteration")
 			}
-			log.Printf("Error while getting all messages: %v", err)
-			return nil, err
+			return nil, logging.Annotate(err, logging.MessageHistory, "scan")
 		}
 
 		messages = append(messages, message)
 	}
-	return messages, rows.Err()
+	return messages, logging.Annotate(rows.Err(), logging.MessageHistory, "iteration")
 }
 
 func (r *MessageRepository) UpdateMessage(ctx context.Context, db sqlx.ExtContext, message models.Message) error {
