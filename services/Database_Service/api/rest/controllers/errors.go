@@ -9,10 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lib/pq"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/services"
 )
 
 func respondError(c *gin.Context, err error) {
+	logging.Capture(c.Request.Context(), err, "response")
 	if c.Request.Context().Err() != nil {
 		return
 	}
@@ -36,7 +38,7 @@ func respondError(c *gin.Context, err error) {
 			code, message = http.StatusBadRequest, "invalid fields or referenced record does not exist"
 		}
 	}
-	if code == http.StatusInternalServerError {
+	if code == http.StatusInternalServerError && logging.FromContext(c.Request.Context()) == nil {
 		log.Printf("request failed: %v", err)
 	}
 	c.JSON(code, gin.H{"error": message})

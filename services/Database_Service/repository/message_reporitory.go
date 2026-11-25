@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	"log"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/models"
 )
 
@@ -16,6 +17,7 @@ type MessageRepositoryInterface interface {
 	GetAllMessages(db *sqlx.DB) ([]models.Message, error)
 	GetAllMessagesBySenderID(db *sqlx.DB, senderId string) ([]models.Message, error)
 	GetMessagesByChatID(ctx context.Context, db *sqlx.DB, chatId int) ([]models.Message, error)
+	GetMessagesBefore(ctx context.Context, db *sqlx.DB, chatID int, beforeID *int, limit int) ([]models.Message, error)
 	UpdateMessage(ctx context.Context, db sqlx.ExtContext, message models.Message) error
 	DeleteMessageByID(db *sqlx.DB, id int) error
 }
@@ -153,8 +155,7 @@ func (r *MessageRepository) GetMessagesByChatID(ctx context.Context, db *sqlx.DB
 	`
 	rows, err := db.QueryContext(ctx, query, chatId)
 	if err != nil {
-		log.Printf("Error while getting all messages: %v", err)
-		return nil, err
+		return nil, logging.Annotate(err, logging.MessageHistory, "query")
 	}
 
 	defer rows.Close()
@@ -170,15 +171,50 @@ func (r *MessageRepository) GetMessagesByChatID(ctx context.Context, db *sqlx.DB
 			&message.SentAt, &message.CryptoVersion, &message.ClientID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				return messages, rows.Err()
+				return messages, logging.Annotate(rows.Err(), logging.MessageHistory, "iteration")
 			}
-			log.Printf("Error while getting all messages: %v", err)
-			return nil, err
+			return nil, logging.Annotate(err, logging.MessageHistory, "scan")
 		}
 
 		messages = append(messages, message)
 	}
-	return messages, rows.Err()
+	return messages, logging.Annotate(rows.Err(), logging.MessageHistory, "iteration")
+}
+
+// GetMessagesBefore returns messages in descending ID order. A nil cursor starts
+// at the newest message; limit includes any lookahead requested by the service.
+func (r *MessageRepository) GetMessagesBefore(ctx context.Context, db *sqlx.DB, chatID int, beforeID *int, limit int) ([]models.Message, error) {
+	query := `
+		SELECT id, chat_id, sender_id, content, COALESCE(encryption_algorithm::text, '') AS encryption_algorithm, sent_at, crypto_version, COALESCE(client_id,'') AS client_id
+		FROM messages
+		WHERE chat_id = $1
+	`
+	args := []any{chatID}
+	if beforeID != nil {
+		query += " AND id < $2"
+		args = append(args, *beforeID)
+	}
+	query += fmt.Sprintf(" ORDER BY id DESC LIMIT $%d", len(args)+1)
+	args = append(args, limit)
+
+	rows, err := db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, logging.Annotate(err, logging.MessageHistory, "query")
+	}
+	defer rows.Close()
+
+	messages := make([]models.Message, 0)
+	for rows.Next() {
+		var message models.Message
+		if err := rows.StructScan(&message); err != nil {
+			return nil, logging.Annotate(err, logging.MessageHistory, "scan")
+		}
+		messages = append(messages, message)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, logging.Annotate(err, logging.MessageHistory, "iteration")
+	}
+	return messages, nil
 }
 
 func (r *MessageRepository) UpdateMessage(ctx context.Context, db sqlx.ExtContext, message models.Message) error {

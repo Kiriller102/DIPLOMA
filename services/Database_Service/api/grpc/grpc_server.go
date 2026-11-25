@@ -9,8 +9,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"log"
+	"log/slog"
 	"net"
+	"os"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -27,13 +30,42 @@ import (
 
 type GRPCServer struct{ server *grpc.Server }
 
-func NewGRPCServer(access *auth.Service) *GRPCServer {
-	server := grpc.NewServer(grpc.ChainUnaryInterceptor(mapErrors, authenticate(access)), grpc.StreamInterceptor(authenticateStream(access)))
+func NewGRPCServer(access *auth.Service, loggers ...*slog.Logger) *GRPCServer {
+	logger := logging.New(os.Stderr, nil)
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(historyCompletion(logger), mapErrors, authenticate(access)), grpc.StreamInterceptor(authenticateStream(access)))
 	h := health.NewServer()
 	h.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 	healthpb.RegisterHealthServer(server, h)
 	reflection.Register(server)
 	return &GRPCServer{server: server}
+}
+
+func historyCompletion(logger *slog.Logger) grpc.UnaryServerInterceptor {
+	classifier := logging.NewClassifier(logging.Sentinels{InvalidInput: services.ErrInvalidInput, Unauthenticated: auth.ErrUnauthenticated, Forbidden: auth.ErrForbidden})
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, next grpc.UnaryHandler) (response interface{}, err error) {
+		if info.FullMethod != messagepb.MessageService_GetMessagesByChatID_FullMethodName {
+			return next(ctx, req)
+		}
+		ctx, completion := logging.Begin(ctx, logger, classifier, "grpc", logging.MessageHistory)
+		returned := false
+		defer func() {
+			if !returned {
+				logging.Capture(ctx, errors.New("RPC interrupted"), "handler")
+			}
+			code := status.Code(err)
+			if !returned {
+				code = codes.Unknown
+			}
+			completion.Finish(ctx, slog.String("rpc_method", info.FullMethod), slog.String("rpc_code", code.String()))
+		}()
+		response, err = next(ctx, req)
+		logging.Capture(ctx, err, "rpc")
+		returned = true
+		return response, err
+	}
 }
 
 func (s *GRPCServer) RegisterServices(userService *services.UserService,
@@ -69,6 +101,7 @@ func mapErrors(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 	if err == nil {
 		return response, nil
 	}
+	logging.Capture(ctx, err, "rpc")
 	if status.Code(err) != codes.Unknown {
 		return nil, err
 	}
@@ -115,6 +148,7 @@ func authenticatedContext(ctx context.Context, method string, access *auth.Servi
 			return next, nil
 		}
 	}
+	logging.Capture(ctx, err, "authentication")
 	if errors.Is(err, auth.ErrUnauthenticated) {
 		return nil, status.Error(codes.Unauthenticated, "authentication required")
 	}
@@ -135,6 +169,7 @@ func authenticate(access *auth.Service) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		next, err := authenticatedContext(ctx, info.FullMethod, access)
 		if err != nil {
+			logging.Capture(ctx, err, "authentication")
 			return nil, err
 		}
 		return handler(next, req)

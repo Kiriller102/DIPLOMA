@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"project/services/Database_Service/auth"
+	"project/services/Database_Service/internal/logging"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/services"
 	"strconv"
@@ -91,25 +92,45 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 	chatID, err := strconv.Atoi(c.Param("chat_id"))
 
 	if err != nil {
+		logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if chatID <= 0 {
+		logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ChatID is empty"})
 		return
 	}
 
+	var beforeID *int
+	if values, exists := c.Request.URL.Query()["before_id"]; exists {
+		if len(values) != 1 {
+			logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "before_id must be specified once"})
+			return
+		}
+		id, err := strconv.Atoi(values[0])
+		if err != nil || id <= 0 {
+			logging.Capture(c.Request.Context(), services.ErrInvalidInput, "validation")
+			c.JSON(http.StatusBadRequest, gin.H{"error": "before_id must be a positive integer"})
+			return
+		}
+		beforeID = &id
+	}
+
 	ctx := c.Request.Context()
 	if err := mc.access.RequireChat(ctx, chatID, false); err != nil {
+		logging.Capture(ctx, err, "access")
 		if ctx.Err() != nil {
 			return
 		}
 		respondError(c, err)
 		return
 	}
-	messages, err := mc.messageService.GetMessagesByChatID(ctx, chatID)
+	page, err := mc.messageService.GetMessagesPageByChatID(ctx, chatID, beforeID)
 
 	if err != nil {
+		logging.Capture(ctx, err, "service")
 		if ctx.Err() != nil {
 			return
 		}
@@ -117,7 +138,7 @@ func (mc *MessageController) GetMessagesByChatID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"messages": messages})
+	c.JSON(http.StatusOK, page)
 }
 
 func (mc *MessageController) UpdateMessage(c *gin.Context) {

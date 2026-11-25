@@ -8,12 +8,20 @@ import (
 	"log"
 	"project/services/Database_Service/models"
 	"project/services/Database_Service/repository"
+	"slices"
 	"time"
 )
 
 type MessageService struct {
 	messageRepo repository.MessageRepository
 	db          *sqlx.DB
+}
+
+const messageHistoryPageSize = 50
+
+type MessageHistoryPage struct {
+	Messages   []models.Message `json:"messages"`
+	NextCursor *int             `json:"next_cursor"`
 }
 
 func NewMessageService(db *sqlx.DB) (*MessageService, error) {
@@ -67,11 +75,35 @@ func (s *MessageService) CreateMessage(ctx context.Context, message *models.Mess
 func (s *MessageService) GetMessagesByChatID(ctx context.Context, ChatID int) ([]models.Message, error) {
 	messages, err := s.messageRepo.GetMessagesByChatID(ctx, s.db, ChatID)
 	if err != nil {
-		log.Printf("error: messageRepo.GetMessagesByChatID error: %v", err)
 		return nil, err
 	}
 
 	return messages, nil
+}
+
+// GetMessagesPageByChatID returns up to 50 messages in ascending ID order.
+// A nil beforeID selects the latest page. NextCursor is nil at the history end.
+func (s *MessageService) GetMessagesPageByChatID(ctx context.Context, chatID int, beforeID *int) (MessageHistoryPage, error) {
+	if chatID <= 0 {
+		return MessageHistoryPage{}, fmt.Errorf("%w: chat id must be positive", ErrInvalidInput)
+	}
+	if beforeID != nil && *beforeID <= 0 {
+		return MessageHistoryPage{}, fmt.Errorf("%w: before_id must be positive", ErrInvalidInput)
+	}
+
+	messages, err := s.messageRepo.GetMessagesBefore(ctx, s.db, chatID, beforeID, messageHistoryPageSize+1)
+	if err != nil {
+		return MessageHistoryPage{}, err
+	}
+
+	var nextCursor *int
+	if len(messages) > messageHistoryPageSize {
+		messages = messages[:messageHistoryPageSize]
+		oldestID := messages[len(messages)-1].ID
+		nextCursor = &oldestID
+	}
+	slices.Reverse(messages)
+	return MessageHistoryPage{Messages: messages, NextCursor: nextCursor}, nil
 }
 
 func (s *MessageService) GetMessageByID(ctx context.Context, messageID int) (models.Message, error) {
